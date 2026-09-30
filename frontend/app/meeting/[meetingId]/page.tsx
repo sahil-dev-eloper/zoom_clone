@@ -361,21 +361,24 @@ export default function MeetingRoomPage({
     pc = new RTCPeerConnection(RTC_CONFIG);
     peerConnectionsRef.current.set(targetPeerId, pc);
 
-    // Pre-allocate audio & video transceivers with sendrecv so m-lines are negotiated immediately
-    const audioTransceiver = pc.addTransceiver('audio', { direction: 'sendrecv' });
-    const videoTransceiver = pc.addTransceiver('video', { direction: 'sendrecv' });
+    // ONLY the initiator pre-allocates transceivers!
+    // The answerer receives them automatically when setting remote description from the offer
+    if (isInitiator) {
+      const audioTransceiver = pc.addTransceiver('audio', { direction: 'sendrecv' });
+      const videoTransceiver = pc.addTransceiver('video', { direction: 'sendrecv' });
 
-    // Attach active tracks if present
-    if (audioStreamRef.current && audioStreamRef.current.getAudioTracks().length > 0) {
-      const aTrack = audioStreamRef.current.getAudioTracks()[0];
-      if (aTrack && aTrack.readyState === 'live') {
-        audioTransceiver.sender.replaceTrack(aTrack).catch(console.warn);
+      // Attach active tracks if present
+      if (audioStreamRef.current && audioStreamRef.current.getAudioTracks().length > 0) {
+        const aTrack = audioStreamRef.current.getAudioTracks()[0];
+        if (aTrack && aTrack.readyState === 'live') {
+          audioTransceiver.sender.replaceTrack(aTrack).catch(console.warn);
+        }
       }
-    }
-    if (videoStreamRef.current && videoStreamRef.current.getVideoTracks().length > 0) {
-      const vTrack = videoStreamRef.current.getVideoTracks()[0];
-      if (vTrack && vTrack.readyState === 'live') {
-        videoTransceiver.sender.replaceTrack(vTrack).catch(console.warn);
+      if (videoStreamRef.current && videoStreamRef.current.getVideoTracks().length > 0) {
+        const vTrack = videoStreamRef.current.getVideoTracks()[0];
+        if (vTrack && vTrack.readyState === 'live') {
+          videoTransceiver.sender.replaceTrack(vTrack).catch(console.warn);
+        }
       }
     }
 
