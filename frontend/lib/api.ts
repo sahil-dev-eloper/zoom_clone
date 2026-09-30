@@ -14,11 +14,36 @@ import type {
   SchedulePayload,
 } from '@/types';
 
-const API = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/+$/, '');
+export function getApiBaseUrl(): string {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (typeof window !== 'undefined') {
+    const isLocalhost =
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1';
+    if (!isLocalhost) {
+      if (!envUrl || envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) {
+        return 'https://zoomclonebe.onrender.com';
+      }
+    }
+  }
+  return (envUrl || 'http://localhost:8000').replace(/\/+$/, '');
+}
+
+export function getWsBaseUrl(meetingId: string): string {
+  const apiBase = getApiBaseUrl();
+  const host = apiBase.replace(/^https?:\/\//, '');
+  const wsProto =
+    apiBase.startsWith('https://') ||
+    (typeof window !== 'undefined' && window.location.protocol === 'https:')
+      ? 'wss://'
+      : 'ws://';
+  return `${wsProto}${host}/ws/meetings/${meetingId}`;
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const base = getApiBaseUrl();
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
-  const response = await fetch(`${API}${cleanPath}`, {
+  const response = await fetch(`${base}${cleanPath}`, {
     ...init,
     headers: {
       'Content-Type': 'application/json',

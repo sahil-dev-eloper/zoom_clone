@@ -20,7 +20,7 @@ import {
   Check,
 } from 'lucide-react';
 
-import { api } from '@/lib/api';
+import { api, getWsBaseUrl } from '@/lib/api';
 import type { Meeting, Participant } from '@/types';
 import { Brand } from '@/components/Brand';
 
@@ -45,7 +45,17 @@ const RTC_CONFIG: RTCConfiguration = {
     { urls: 'stun:stun3.l.google.com:19302' },
     { urls: 'stun:stun4.l.google.com:19302' },
   ],
+  iceCandidatePoolSize: 10,
 };
+
+function getMediaSender(pc: RTCPeerConnection, kind: 'audio' | 'video'): RTCRtpSender | null {
+  const transceivers = pc.getTransceivers();
+  const match = transceivers.find((t) => t.receiver.track.kind === kind || t.sender.track?.kind === kind);
+  if (match) return match.sender;
+  const senders = pc.getSenders();
+  const senderMatch = senders.find((s) => s.track?.kind === kind);
+  return senderMatch || null;
+}
 
 // ---------------------------------------------------------------------------
 // Meeting Room Page
@@ -91,7 +101,7 @@ export default function MeetingRoomPage({
   const [localVolume, setLocalVolume] = useState(0);
   const [peerSpeaking, setPeerSpeaking] = useState<Record<string, boolean>>({});
   const [peerMediaState, setPeerMediaState] = useState<Record<string, { video: boolean; audio: boolean }>>({});
-  const [, setStreamVersion] = useState(0);
+  const [streamVersion, setStreamVersion] = useState(0);
   const [audioBlocked, setAudioBlocked] = useState(false);
 
   // WebRTC remote streams keyed by peerId (sessionId)
@@ -107,6 +117,8 @@ export default function MeetingRoomPage({
   const wsRef = useRef<WebSocket | null>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const pendingCandidatesRef = useRef<Record<string, RTCIceCandidateInit[]>>({});
+  const remoteMediaStreamsRef = useRef<Record<string, MediaStream>>({});
+  const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const remoteAudioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
 
   // Web Audio Context & Analyser Refs
@@ -151,6 +163,29 @@ export default function MeetingRoomPage({
       window.removeEventListener('keydown', handleUserGesture);
     };
   }, [handleUserGesture]);
+
+  // Keep remote video and audio elements active and bound to streams
+  useEffect(() => {
+    Object.entries(remoteStreams).forEach(([peerId, stream]) => {
+      const vEl = remoteVideoRefs.current.get(peerId);
+      if (vEl && stream) {
+        if (vEl.srcObject !== stream) {
+          vEl.srcObject = stream;
+        }
+        vEl.play().catch(() => {});
+      }
+      const aEl = remoteAudioRefs.current.get(peerId);
+      if (aEl && stream) {
+        if (aEl.srcObject !== stream) {
+          aEl.srcObject = stream;
+        }
+        aEl.play().catch((err) => {
+          console.warn('Audio play prevented:', err);
+          setAudioBlocked(true);
+        });
+      }
+    });
+  }, [remoteStreams, streamVersion, peerMediaState]);
 
   // ---- Attach Analyser for Remote Stream ----
 
@@ -205,7 +240,6 @@ export default function MeetingRoomPage({
       setPeople(parts);
       setHasLoadedInitialParticipants(true);
 
-      // If user had joined and sessionId is active, verify they are still in participants
       if (sessionId) {
         const stillInRoom = parts.some(
           (p) => p.session_id === sessionId && p.left_at === null
@@ -227,7 +261,6 @@ export default function MeetingRoomPage({
     if (!sessionId) return;
     loadParticipants();
 
-    // Poll participants every 4 seconds
     pollRef.current = setInterval(loadParticipants, 4000);
 
     return () => {
@@ -266,7 +299,6 @@ export default function MeetingRoomPage({
         const isSpk = vol > 7;
         setLocalSpeaking((prev) => {
           if (prev !== isSpk) {
-            // Send speaking update over websocket
             if (wsRef.current?.readyState === WebSocket.OPEN) {
               wsRef.current.send(
                 JSON.stringify({
@@ -345,7 +377,7 @@ export default function MeetingRoomPage({
             type: 'candidate',
             peerId: sessionId,
             targetPeerId: targetPeerId,
-            candidate: event.candidate,
+            candidate: event.candidate.toJSON ? event.candidate.toJSON() : event.candidate,
           })
         );
       }
@@ -354,16 +386,22 @@ export default function MeetingRoomPage({
     // Receive remote media tracks
     pc.ontrack = (event) => {
       const track = event.track;
-      setRemoteStreams((prev) => {
-        const stream = prev[targetPeerId] || new MediaStream();
-        if (!stream.getTracks().some((t) => t.id === track.id)) {
-          stream.addTrack(track);
-        }
-        return {
-          ...prev,
-          [targetPeerId]: stream,
-        };
-      });
+      console.log('Remote track received:', track.kind, track.id, 'from', targetPeerId);
+
+      if (!remoteMediaStreamsRef.current[targetPeerId]) {
+        remoteMediaStreamsRef.current[targetPeerId] = new MediaStream();
+      }
+      const stream = remoteMediaStreamsRef.current[targetPeerId];
+
+      // Remove any existing dead tracks of the same kind
+      stream.getTracks().filter((t) => t.kind === track.kind && t.id !== track.id).forEach((t) => stream.removeTrack(t));
+
+      if (!stream.getTracks().some((t) => t.id === track.id)) {
+        stream.addTrack(track);
+      }
+
+      setRemoteStreams({ ...remoteMediaStreamsRef.current });
+      setStreamVersion((v) => v + 1);
 
       const onTrackChange = () => setStreamVersion((v) => v + 1);
       track.addEventListener('mute', onTrackChange);
@@ -372,16 +410,13 @@ export default function MeetingRoomPage({
 
       if (track.kind === 'audio') {
         setTimeout(() => {
-          setRemoteStreams((prev) => {
-            const st = prev[targetPeerId];
-            if (st) attachRemoteAnalyser(targetPeerId, st);
-            return prev;
-          });
+          attachRemoteAnalyser(targetPeerId, stream);
         }, 150);
       }
     };
 
     pc.oniceconnectionstatechange = () => {
+      console.log(`ICE Connection State for ${targetPeerId}: ${pc.iceConnectionState}`);
       if (pc.iceConnectionState === 'failed') {
         pc.restartIce();
       }
@@ -414,15 +449,14 @@ export default function MeetingRoomPage({
   useEffect(() => {
     if (!sessionId || !meetingId) return;
 
-    const baseApi = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/+$/, '');
-    const wsUrl = baseApi.replace(/^http/, 'ws') + `/ws/meetings/${meetingId}`;
-
+    const wsUrl = getWsBaseUrl(meetingId);
     let socket: WebSocket;
     try {
       socket = new WebSocket(wsUrl);
       wsRef.current = socket;
 
       socket.onopen = () => {
+        console.log('WebSocket connected to signaling:', wsUrl);
         socket.send(
           JSON.stringify({
             type: 'join',
@@ -437,7 +471,6 @@ export default function MeetingRoomPage({
           const msg = JSON.parse(event.data);
 
           if (msg.type === 'peers') {
-            // Newcomer receives existing peer list -> initiate connection to each
             if (Array.isArray(msg.peerIds)) {
               msg.peerIds.forEach((pid: string) => {
                 if (pid && pid !== sessionId) {
@@ -447,7 +480,6 @@ export default function MeetingRoomPage({
             }
             loadParticipants();
 
-            // Broadcast current media state
             if (socket.readyState === WebSocket.OPEN) {
               socket.send(
                 JSON.stringify({
@@ -460,7 +492,6 @@ export default function MeetingRoomPage({
             }
           } else if (msg.type === 'peer-joined') {
             loadParticipants();
-            // Send our current media state to the new peer
             if (socket.readyState === WebSocket.OPEN) {
               socket.send(
                 JSON.stringify({
@@ -478,6 +509,16 @@ export default function MeetingRoomPage({
               pc = createPeerConnection(msg.peerId, false);
             }
             await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+
+            // Attach active local tracks to matched transceivers
+            const vSender = getMediaSender(pc, 'video');
+            if (vSender && videoStreamRef.current?.getVideoTracks()[0]) {
+              await vSender.replaceTrack(videoStreamRef.current.getVideoTracks()[0]).catch(console.warn);
+            }
+            const aSender = getMediaSender(pc, 'audio');
+            if (aSender && audioStreamRef.current?.getAudioTracks()[0]) {
+              await aSender.replaceTrack(audioStreamRef.current.getAudioTracks()[0]).catch(console.warn);
+            }
 
             // Flush pending ICE candidates
             const queued = pendingCandidatesRef.current[msg.peerId] || [];
@@ -545,11 +586,8 @@ export default function MeetingRoomPage({
               }
               remoteAnalysersRef.current.delete(msg.peerId);
             }
-            setRemoteStreams((prev) => {
-              const copy = { ...prev };
-              delete copy[msg.peerId];
-              return copy;
-            });
+            delete remoteMediaStreamsRef.current[msg.peerId];
+            setRemoteStreams({ ...remoteMediaStreamsRef.current });
             setPeerSpeaking((prev) => {
               const copy = { ...prev };
               delete copy[msg.peerId];
@@ -571,7 +609,6 @@ export default function MeetingRoomPage({
     }
 
     return () => {
-      // Clean up peer connections
       peerConnectionsRef.current.forEach((pc) => pc.close());
       peerConnectionsRef.current.clear();
       pendingCandidatesRef.current = {};
@@ -634,10 +671,9 @@ export default function MeetingRoomPage({
 
       // Seamlessly replace video track with null on all peer connections
       peerConnectionsRef.current.forEach((pc) => {
-        const senders = pc.getSenders();
-        const videoSender = senders.find((s) => s.track?.kind === 'video' || (s as { kind?: string }).kind === 'video');
-        if (videoSender) {
-          videoSender.replaceTrack(null).catch(console.warn);
+        const vSender = getMediaSender(pc, 'video');
+        if (vSender) {
+          vSender.replaceTrack(null).catch(console.warn);
         }
       });
 
@@ -670,10 +706,9 @@ export default function MeetingRoomPage({
       const videoTrack = stream.getVideoTracks()[0];
       if (videoTrack) {
         peerConnectionsRef.current.forEach((pc) => {
-          const senders = pc.getSenders();
-          const videoSender = senders.find((s) => s.track?.kind === 'video' || (s as { kind?: string }).kind === 'video');
-          if (videoSender) {
-            videoSender.replaceTrack(videoTrack).catch(console.warn);
+          const vSender = getMediaSender(pc, 'video');
+          if (vSender) {
+            vSender.replaceTrack(videoTrack).catch(console.warn);
           } else {
             pc.addTrack(videoTrack, stream);
           }
@@ -708,6 +743,13 @@ export default function MeetingRoomPage({
       setMuted(true);
       setLocalSpeaking(false);
       setLocalVolume(0);
+
+      peerConnectionsRef.current.forEach((pc) => {
+        const aSender = getMediaSender(pc, 'audio');
+        if (aSender) {
+          aSender.replaceTrack(null).catch(console.warn);
+        }
+      });
 
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(
@@ -759,12 +801,10 @@ export default function MeetingRoomPage({
       if (audioTrack) {
         audioTrack.enabled = true;
 
-        // Replace track on all peer connections
         peerConnectionsRef.current.forEach((pc) => {
-          const senders = pc.getSenders();
-          const audioSender = senders.find((s) => s.track?.kind === 'audio' || (s as { kind?: string }).kind === 'audio');
-          if (audioSender) {
-            audioSender.replaceTrack(audioTrack).catch(console.warn);
+          const aSender = getMediaSender(pc, 'audio');
+          if (aSender) {
+            aSender.replaceTrack(audioTrack).catch(console.warn);
           } else {
             pc.addTrack(audioTrack, stream!);
           }
@@ -774,9 +814,7 @@ export default function MeetingRoomPage({
         const ctx = getOrCreateAudioContext();
         if (ctx) {
           try {
-            if (localAnalyserRef.current) {
-              // already set
-            } else {
+            if (!localAnalyserRef.current) {
               const source = ctx.createMediaStreamSource(stream);
               const analyser = ctx.createAnalyser();
               analyser.fftSize = 256;
@@ -850,6 +888,7 @@ export default function MeetingRoomPage({
     peerConnectionsRef.current.forEach((pc) => pc.close());
     peerConnectionsRef.current.clear();
     pendingCandidatesRef.current = {};
+    remoteMediaStreamsRef.current = {};
     remoteAnalysersRef.current.forEach(({ source }) => {
       try {
         source.disconnect();
@@ -1224,14 +1263,24 @@ export default function MeetingRoomPage({
           {/* Other participants */}
           {otherPeople.slice(0, 5).map((p) => {
             const remoteStream = remoteStreams[p.session_id];
-            const hasVideo =
-              (peerMediaState[p.session_id]?.video ?? false) ||
-              (remoteStream &&
-                remoteStream
-                  .getVideoTracks()
-                  .some((t) => t.enabled && !t.muted && t.readyState === 'live'));
+            const hasLiveVideoTrack = Boolean(
+              remoteStream &&
+              remoteStream.getVideoTracks().some(
+                (t) => t.enabled && !t.muted && t.readyState === 'live'
+              )
+            );
+            const hasPeerVideoState = peerMediaState[p.session_id]?.video ?? false;
+            const hasVideo = hasLiveVideoTrack || hasPeerVideoState;
+
             const isSpeaking = peerSpeaking[p.session_id] ?? false;
-            const isAudioOn = peerMediaState[p.session_id]?.audio ?? true;
+            const peerAudioState = peerMediaState[p.session_id]?.audio;
+            const hasLiveAudioTrack = Boolean(
+              remoteStream &&
+              remoteStream.getAudioTracks().some(
+                (t) => t.enabled && !t.muted && t.readyState === 'live'
+              )
+            );
+            const isAudioOn = peerAudioState !== undefined ? peerAudioState : hasLiveAudioTrack;
 
             return (
               <div className="tile" key={p.id}>
@@ -1261,9 +1310,14 @@ export default function MeetingRoomPage({
                   playsInline
                   muted
                   ref={(el) => {
-                    if (el && remoteStream && el.srcObject !== remoteStream) {
-                      el.srcObject = remoteStream;
-                      el.play().catch(() => {});
+                    if (el) {
+                      remoteVideoRefs.current.set(p.session_id, el);
+                      if (remoteStream && el.srcObject !== remoteStream) {
+                        el.srcObject = remoteStream;
+                        el.play().catch(() => {});
+                      }
+                    } else {
+                      remoteVideoRefs.current.delete(p.session_id);
                     }
                   }}
                   style={{
