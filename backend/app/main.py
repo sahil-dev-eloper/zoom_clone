@@ -46,19 +46,40 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+origins = [
+    FRONTEND_URL,
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+if FRONTEND_URL and FRONTEND_URL not in origins:
+    origins.append(FRONTEND_URL)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        FRONTEND_URL,
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 app.include_router(router)
+
+
+@app.get("/")
+def root():
+    return {
+        "name": "FocusRoom API",
+        "status": "online",
+        "docs": "/docs",
+        "health": "/health",
+        "endpoints": {
+            "upcoming": "/api/meetings/upcoming",
+            "recent": "/api/meetings/recent",
+            "instant": "/api/meetings/instant",
+            "schedule": "/api/meetings/schedule",
+        },
+    }
 
 
 @app.get("/health")
