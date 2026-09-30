@@ -64,9 +64,9 @@ export function Sidebar({ onJoin, onSchedule, isOpen, onClose }: SidebarProps) {
         <hr className="divider" style={{ margin: '12px 8px' }} />
 
         <div className="profile" style={{ padding: '0 12px' }}>
-          <div className="avatar">AM</div>
+          <div className="avatar">SD</div>
           <div>
-            <strong style={{ fontSize: 13 }}>Alex Morgan</strong>
+            <strong style={{ fontSize: 13 }}>Sahil Dargar</strong>
             <small>Personal workspace</small>
           </div>
         </div>

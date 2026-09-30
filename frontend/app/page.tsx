@@ -65,9 +65,9 @@ export default function Dashboard() {
       const m = await api.instant();
       const joined = await api.join({
         meeting_id: m.meeting_id,
-        display_name: 'Alex Morgan',
+        display_name: 'Sahil Dargar',
       });
-      window.location.href = `/meeting/${m.meeting_id}?session=${joined.session_id}&name=Alex%20Morgan&host=true`;
+      window.location.href = `/meeting/${m.meeting_id}?session=${joined.session_id}&name=Sahil%20Dargar&host=true`;
     } catch (e) {
       setError(
         e instanceof Error ? e.message : 'Unable to start meeting.'

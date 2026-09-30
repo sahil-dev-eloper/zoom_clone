@@ -24,7 +24,7 @@ class Meeting(Base):
     invite_token: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     title: Mapped[str] = mapped_column(String(160))
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    host_name: Mapped[str] = mapped_column(String(100), default="Alex Morgan")
+    host_name: Mapped[str] = mapped_column(String(100), default="Sahil Dargar")
     scheduled_time: Mapped[datetime] = mapped_column(DateTime, index=True)
     duration_minutes: Mapped[int] = mapped_column(Integer, default=30)
     status: Mapped[str] = mapped_column(String(20), default="scheduled", index=True)

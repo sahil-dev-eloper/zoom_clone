@@ -40,9 +40,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="FocusRoom API",
+    title="Zooom API",
     version="1.0.0",
-    description="Backend API for the FocusRoom meeting workspace.",
+    description="Backend API for the Zooom meeting workspace.",
     lifespan=lifespan,
 )
 
@@ -69,7 +69,7 @@ app.include_router(router)
 @app.get("/")
 def root():
     return {
-        "name": "FocusRoom API",
+        "name": "Zooom API",
         "status": "online",
         "docs": "/docs",
         "health": "/health",

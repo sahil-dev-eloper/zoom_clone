@@ -279,10 +279,10 @@ class TestHostControls:
         meeting = client.post("/api/meetings/instant").json()
         mid = meeting["meeting_id"]
 
-        # Join as host (Alex Morgan)
+        # Join as host (Sahil Dargar)
         host_join = client.post(
             "/api/meetings/join",
-            json={"meeting_id": mid, "display_name": "Alex Morgan"},
+            json={"meeting_id": mid, "display_name": "Sahil Dargar"},
         ).json()
         assert host_join["is_host"] is True
 
@@ -336,7 +336,7 @@ class TestHostControls:
 
         host_join = client.post(
             "/api/meetings/join",
-            json={"meeting_id": mid, "display_name": "Alex Morgan"},
+            json={"meeting_id": mid, "display_name": "Sahil Dargar"},
         ).json()
 
         kick_resp = client.post(

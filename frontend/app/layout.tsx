@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'FocusRoom | Modern Meeting Workspace',
+  title: 'Zooom | Modern Meeting Workspace',
   description:
-    'A polished, Zoom-inspired meeting workspace. Create, schedule, and join meetings with real-time collaboration.',
+    'A polished, Zoom-inspired meeting workspace. Create, schedule, and join meetings with real-time video, audio, and collaboration.',
 };
 
 export default function RootLayout({

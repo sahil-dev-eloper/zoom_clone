@@ -35,7 +35,7 @@ export function Brand({ variant = 'light', size = 'md' }: BrandProps) {
       >
         <Video size={size === 'sm' ? 14 : 16} />
       </span>
-      <span style={{ fontSize: size === 'sm' ? 16 : 20 }}>focusroom</span>
+      <span style={{ fontSize: size === 'sm' ? 17 : 22, fontWeight: 700, letterSpacing: '-0.03em' }}>Zooom</span>
     </div>
   );
 }

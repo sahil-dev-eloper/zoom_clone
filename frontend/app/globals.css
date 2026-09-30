@@ -783,13 +783,19 @@ img, video { display: block; max-width: 100%; }
 .video-grid {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 12px;
   align-content: center;
+  width: 100%;
 }
 
-.video-grid.solo { grid-template-columns: 1fr; }
-.video-grid.three { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.video-grid.solo {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 840px;
+  margin: 0 auto;
+}
+.video-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.video-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .video-grid.four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
 .tile {

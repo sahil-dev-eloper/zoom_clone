@@ -58,7 +58,7 @@ function getMediaSender(pc: RTCPeerConnection, kind: 'audio' | 'video'): RTCRtpS
 }
 
 // ---------------------------------------------------------------------------
-// Meeting Room Page
+// Zooom Meeting Room Page
 // ---------------------------------------------------------------------------
 
 export default function MeetingRoomPage({
@@ -126,6 +126,16 @@ export default function MeetingRoomPage({
   const localAnalyserRef = useRef<AnalyserNode | null>(null);
   const remoteAnalysersRef = useRef<Map<string, { analyser: AnalyserNode; source: MediaStreamAudioSourceNode }>>(new Map());
   const vadIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Ref mirrors for media states to avoid tearing down WebSocket on media toggles
+  const cameraOnRef = useRef(cameraOn);
+  cameraOnRef.current = cameraOn;
+  const mutedRef = useRef(muted);
+  mutedRef.current = muted;
+  const displayNameRef = useRef(displayName);
+  displayNameRef.current = displayName;
+  const sessionIdRef = useRef(sessionId);
+  sessionIdRef.current = sessionId;
 
   // ---- AudioContext Helper ----
 
@@ -240,9 +250,9 @@ export default function MeetingRoomPage({
       setPeople(parts);
       setHasLoadedInitialParticipants(true);
 
-      if (sessionId) {
+      if (sessionIdRef.current) {
         const stillInRoom = parts.some(
-          (p) => p.session_id === sessionId && p.left_at === null
+          (p) => p.session_id === sessionIdRef.current && p.left_at === null
         );
         if (hasLoadedInitialParticipants && !stillInRoom) {
           setKicked(true);
@@ -251,7 +261,7 @@ export default function MeetingRoomPage({
     } catch {
       // Silent fail for polling
     }
-  }, [meetingId, sessionId, hasLoadedInitialParticipants]);
+  }, [meetingId, hasLoadedInitialParticipants]);
 
   useEffect(() => {
     loadMeeting();
@@ -287,7 +297,7 @@ export default function MeetingRoomPage({
 
     vadIntervalRef.current = setInterval(() => {
       // 1. Check local audio
-      if (localAnalyserRef.current && !muted && audioStreamRef.current?.getAudioTracks().some((t) => t.enabled)) {
+      if (localAnalyserRef.current && !mutedRef.current && audioStreamRef.current?.getAudioTracks().some((t) => t.enabled)) {
         const data = new Uint8Array(localAnalyserRef.current.frequencyBinCount);
         localAnalyserRef.current.getByteFrequencyData(data);
         let sum = 0;
@@ -303,7 +313,7 @@ export default function MeetingRoomPage({
               wsRef.current.send(
                 JSON.stringify({
                   type: 'speaking',
-                  peerId: sessionId,
+                  peerId: sessionIdRef.current,
                   speaking: isSpk,
                 })
               );
@@ -338,7 +348,7 @@ export default function MeetingRoomPage({
     return () => {
       if (vadIntervalRef.current) clearInterval(vadIntervalRef.current);
     };
-  }, [sessionId, muted]);
+  }, [sessionId]);
 
   // ---- WebRTC Peer Connection Helper (Transceiver Pattern) ----
 
@@ -375,7 +385,7 @@ export default function MeetingRoomPage({
         wsRef.current.send(
           JSON.stringify({
             type: 'candidate',
-            peerId: sessionId,
+            peerId: sessionIdRef.current,
             targetPeerId: targetPeerId,
             candidate: event.candidate.toJSON ? event.candidate.toJSON() : event.candidate,
           })
@@ -431,7 +441,7 @@ export default function MeetingRoomPage({
             wsRef.current.send(
               JSON.stringify({
                 type: 'offer',
-                peerId: sessionId,
+                peerId: sessionIdRef.current,
                 targetPeerId: targetPeerId,
                 sdp: pc.localDescription,
               })
@@ -442,9 +452,13 @@ export default function MeetingRoomPage({
     }
 
     return pc;
-  }, [sessionId, attachRemoteAnalyser]);
+  }, [attachRemoteAnalyser]);
 
-  // ---- WebSocket Signaling ----
+  // Keep a ref to createPeerConnection so useEffect doesn't tear down on changes
+  const createPeerConnectionRef = useRef(createPeerConnection);
+  createPeerConnectionRef.current = createPeerConnection;
+
+  // ---- WebSocket Signaling (Runs ONLY for session lifecycle) ----
 
   useEffect(() => {
     if (!sessionId || !meetingId) return;
@@ -456,12 +470,12 @@ export default function MeetingRoomPage({
       wsRef.current = socket;
 
       socket.onopen = () => {
-        console.log('WebSocket connected to signaling:', wsUrl);
+        console.log('WebSocket connected to Zooom signaling:', wsUrl);
         socket.send(
           JSON.stringify({
             type: 'join',
             peerId: sessionId,
-            displayName: displayName || 'Guest',
+            displayName: displayNameRef.current || 'Sahil Dargar',
           })
         );
       };
@@ -474,7 +488,7 @@ export default function MeetingRoomPage({
             if (Array.isArray(msg.peerIds)) {
               msg.peerIds.forEach((pid: string) => {
                 if (pid && pid !== sessionId) {
-                  createPeerConnection(pid, true);
+                  createPeerConnectionRef.current(pid, true);
                 }
               });
             }
@@ -485,8 +499,8 @@ export default function MeetingRoomPage({
                 JSON.stringify({
                   type: 'media-state',
                   peerId: sessionId,
-                  video: cameraOn,
-                  audio: !muted,
+                  video: cameraOnRef.current,
+                  audio: !mutedRef.current,
                 })
               );
             }
@@ -498,15 +512,15 @@ export default function MeetingRoomPage({
                   type: 'media-state',
                   peerId: sessionId,
                   targetPeerId: msg.peerId,
-                  video: cameraOn,
-                  audio: !muted,
+                  video: cameraOnRef.current,
+                  audio: !mutedRef.current,
                 })
               );
             }
           } else if (msg.type === 'offer') {
             let pc = peerConnectionsRef.current.get(msg.peerId);
             if (!pc || pc.signalingState === 'closed') {
-              pc = createPeerConnection(msg.peerId, false);
+              pc = createPeerConnectionRef.current(msg.peerId, false);
             }
             await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
 
@@ -627,7 +641,7 @@ export default function MeetingRoomPage({
         }
       }
     };
-  }, [sessionId, meetingId, displayName, cameraOn, muted, createPeerConnection, loadParticipants]);
+  }, [sessionId, meetingId, loadParticipants]);
 
   // ---- Handle Lobby Direct Join ----
 
@@ -983,7 +997,7 @@ export default function MeetingRoomPage({
             Removed from meeting
           </h2>
           <p style={{ color: '#94a3b8', marginBottom: 24, fontSize: 14 }}>
-            The meeting host has removed you from this meeting room.
+            The meeting host has removed you from this Zooom room.
           </p>
           <a className="btn btn-primary" href="/">
             Return home
@@ -1039,7 +1053,7 @@ export default function MeetingRoomPage({
           }}
         >
           <LoaderCircle size={32} className="spin" />
-          <span>Connecting to FocusRoom...</span>
+          <span>Connecting to Zooom...</span>
         </div>
       </main>
     );
@@ -1060,7 +1074,7 @@ export default function MeetingRoomPage({
           </div>
 
           <p style={{ color: 'var(--muted)', fontSize: 13, marginBottom: 20 }}>
-            {meeting.description || 'You are about to join this meeting room.'}
+            {meeting.description || 'You are about to join this Zooom meeting.'}
           </p>
 
           <div className="field">
@@ -1069,7 +1083,7 @@ export default function MeetingRoomPage({
               id="lobby-name"
               value={joinPromptName}
               onChange={(e) => setJoinPromptName(e.target.value)}
-              placeholder="e.g. Alex Morgan or your name"
+              placeholder="e.g. Sahil Dargar or your name"
               onKeyDown={(e) => e.key === 'Enter' && handleLobbyJoin()}
               autoFocus
             />
@@ -1095,7 +1109,7 @@ export default function MeetingRoomPage({
     );
   }
 
-  // ---- Grid layout calculation ----
+  // ---- Grid layout calculation (All participants in mesh) ----
 
   const otherPeople = people.filter(
     (p) => p.session_id !== sessionId
@@ -1110,7 +1124,7 @@ export default function MeetingRoomPage({
           ? 'video-grid four'
           : 'video-grid';
 
-  // ---- Render: Active Meeting Room ----
+  // ---- Render: Active Zooom Meeting Room ----
 
   return (
     <main className="meeting-room">
@@ -1260,8 +1274,8 @@ export default function MeetingRoomPage({
             {localSpeaking && <span className="speaking-ring" />}
           </div>
 
-          {/* Other participants */}
-          {otherPeople.slice(0, 5).map((p) => {
+          {/* ALL other participants in the meeting (No slice limits) */}
+          {otherPeople.map((p) => {
             const remoteStream = remoteStreams[p.session_id];
             const hasLiveVideoTrack = Boolean(
               remoteStream &&
@@ -1304,7 +1318,7 @@ export default function MeetingRoomPage({
                   }}
                 />
 
-                {/* Always-mounted Video element */}
+                {/* Always-mounted Video element for instant display */}
                 <video
                   autoPlay
                   playsInline
@@ -1364,7 +1378,7 @@ export default function MeetingRoomPage({
               </span>
             </h3>
             <p className="side-panel-note">
-              Invite people to this room using the invitation link below.
+              Invite people to this Zooom room using the invitation link below.
             </p>
 
             {/* Participant list */}
@@ -1445,7 +1459,7 @@ export default function MeetingRoomPage({
 
             {/* Invite section */}
             <div className="invite-section">
-              <p>Share this link to invite others:</p>
+              <p>Share this link to invite others to Zooom:</p>
               <div className="invite-input-row">
                 <input
                   readOnly

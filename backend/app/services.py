@@ -12,7 +12,7 @@ from .models import Meeting, MeetingHistory, Participant
 # The default host identity.  Not a real auth system — documented as a
 # limitation.  Any user whose display_name matches HOST_NAME is treated as
 # host for the purpose of join logic.
-HOST_NAME = "Alex Morgan"
+HOST_NAME = "Sahil Dargar"
 
 
 def meeting_out(meeting: Meeting, base_url: str) -> dict:
