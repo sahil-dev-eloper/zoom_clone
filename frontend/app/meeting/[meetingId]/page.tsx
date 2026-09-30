@@ -37,6 +37,14 @@ function useSearchParams() {
   return new URLSearchParams(window.location.search);
 }
 
+const RTC_CONFIG: RTCConfiguration = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+  ],
+};
+
 // ---------------------------------------------------------------------------
 // Meeting Room Page
 // ---------------------------------------------------------------------------
@@ -76,6 +84,9 @@ export default function MeetingRoomPage({
   const [kicked, setKicked] = useState(false);
   const [hasLoadedInitialParticipants, setHasLoadedInitialParticipants] = useState(false);
 
+  // WebRTC remote streams keyed by peerId (sessionId)
+  const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
+
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const screenVideoRef = useRef<HTMLVideoElement>(null);
@@ -84,6 +95,7 @@ export default function MeetingRoomPage({
   const screenStreamRef = useRef<MediaStream | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
 
   // ---- Load meeting details ----
 
@@ -139,12 +151,94 @@ export default function MeetingRoomPage({
     };
   }, [sessionId, loadParticipants]);
 
+  // Ensure local video element updates whenever cameraOn or stream changes
+  useEffect(() => {
+    if (videoRef.current && videoStreamRef.current) {
+      videoRef.current.srcObject = videoStreamRef.current;
+      videoRef.current.play().catch(() => {});
+    }
+  }, [cameraOn]);
+
+  // ---- WebRTC Peer Connection Helper ----
+
+  const createPeerConnection = useCallback((targetPeerId: string, isInitiator: boolean) => {
+    // Close existing connection if any
+    const existing = peerConnectionsRef.current.get(targetPeerId);
+    if (existing) {
+      existing.close();
+    }
+
+    const pc = new RTCPeerConnection(RTC_CONFIG);
+    peerConnectionsRef.current.set(targetPeerId, pc);
+
+    // Add local media tracks if active
+    if (videoStreamRef.current) {
+      videoStreamRef.current.getTracks().forEach((track) => {
+        pc.addTrack(track, videoStreamRef.current!);
+      });
+    }
+    if (audioStreamRef.current) {
+      audioStreamRef.current.getTracks().forEach((track) => {
+        pc.addTrack(track, audioStreamRef.current!);
+      });
+    }
+
+    // ICE Candidate exchange
+    pc.onicecandidate = (event) => {
+      if (event.candidate && wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(
+          JSON.stringify({
+            type: 'candidate',
+            peerId: sessionId,
+            targetPeerId: targetPeerId,
+            candidate: event.candidate,
+          })
+        );
+      }
+    };
+
+    // Receive remote media tracks
+    pc.ontrack = (event) => {
+      const [stream] = event.streams;
+      if (stream) {
+        setRemoteStreams((prev) => ({
+          ...prev,
+          [targetPeerId]: stream,
+        }));
+      }
+    };
+
+    // If initiator, create and send offer
+    if (isInitiator) {
+      pc.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true,
+      })
+        .then((offer) => pc.setLocalDescription(offer))
+        .then(() => {
+          if (wsRef.current?.readyState === WebSocket.OPEN && pc.localDescription) {
+            wsRef.current.send(
+              JSON.stringify({
+                type: 'offer',
+                peerId: sessionId,
+                targetPeerId: targetPeerId,
+                sdp: pc.localDescription,
+              })
+            );
+          }
+        })
+        .catch((err) => console.error('Error creating WebRTC offer:', err));
+    }
+
+    return pc;
+  }, [sessionId]);
+
   // ---- WebSocket Signaling ----
 
   useEffect(() => {
     if (!sessionId || !meetingId) return;
 
-    const baseApi = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const baseApi = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/+$/, '');
     const wsUrl = baseApi.replace(/^http/, 'ws') + `/ws/meetings/${meetingId}`;
 
     let socket: WebSocket;
@@ -162,14 +256,65 @@ export default function MeetingRoomPage({
         );
       };
 
-      socket.onmessage = (event) => {
+      socket.onmessage = async (event) => {
         try {
           const msg = JSON.parse(event.data);
-          if (msg.type === 'peer-joined' || msg.type === 'peer-left') {
+
+          if (msg.type === 'peers') {
+            // Newcomer receives existing peer list -> initiate connection to each
+            if (Array.isArray(msg.peerIds)) {
+              msg.peerIds.forEach((pid: string) => {
+                if (pid && pid !== sessionId) {
+                  createPeerConnection(pid, true);
+                }
+              });
+            }
+            loadParticipants();
+          } else if (msg.type === 'peer-joined') {
+            loadParticipants();
+          } else if (msg.type === 'offer') {
+            // Received offer from peer -> create PC, set remote description, send answer
+            const pc = createPeerConnection(msg.peerId, false);
+            await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            if (wsRef.current?.readyState === WebSocket.OPEN && pc.localDescription) {
+              wsRef.current.send(
+                JSON.stringify({
+                  type: 'answer',
+                  peerId: sessionId,
+                  targetPeerId: msg.peerId,
+                  sdp: pc.localDescription,
+                })
+              );
+            }
+          } else if (msg.type === 'answer') {
+            // Received answer to our offer
+            const pc = peerConnectionsRef.current.get(msg.peerId);
+            if (pc) {
+              await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+            }
+          } else if (msg.type === 'candidate') {
+            // Received ICE candidate
+            const pc = peerConnectionsRef.current.get(msg.peerId);
+            if (pc && msg.candidate) {
+              await pc.addIceCandidate(new RTCIceCandidate(msg.candidate));
+            }
+          } else if (msg.type === 'peer-left') {
+            const pc = peerConnectionsRef.current.get(msg.peerId);
+            if (pc) {
+              pc.close();
+              peerConnectionsRef.current.delete(msg.peerId);
+            }
+            setRemoteStreams((prev) => {
+              const copy = { ...prev };
+              delete copy[msg.peerId];
+              return copy;
+            });
             loadParticipants();
           }
-        } catch {
-          // ignore malformed ws messages
+        } catch (err) {
+          console.warn('WebRTC signaling message handling error:', err);
         }
       };
     } catch {
@@ -177,6 +322,10 @@ export default function MeetingRoomPage({
     }
 
     return () => {
+      // Clean up peer connections
+      peerConnectionsRef.current.forEach((pc) => pc.close());
+      peerConnectionsRef.current.clear();
+
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         try {
           wsRef.current.send(
@@ -191,7 +340,7 @@ export default function MeetingRoomPage({
         }
       }
     };
-  }, [sessionId, meetingId, displayName, loadParticipants]);
+  }, [sessionId, meetingId, displayName, createPeerConnection, loadParticipants]);
 
   // ---- Handle Lobby Direct Join ----
 
@@ -225,7 +374,7 @@ export default function MeetingRoomPage({
     }
   };
 
-  // ---- Media controls ----
+  // ---- Media controls (Camera & Mic) ----
 
   const toggleCamera = async () => {
     if (cameraOn) {
@@ -233,6 +382,14 @@ export default function MeetingRoomPage({
       videoStreamRef.current = null;
       if (videoRef.current) videoRef.current.srcObject = null;
       setCameraOn(false);
+
+      // Remove video track from all peer connections
+      peerConnectionsRef.current.forEach((pc) => {
+        const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
+        if (sender) {
+          pc.removeTrack(sender);
+        }
+      });
       return;
     }
 
@@ -248,9 +405,38 @@ export default function MeetingRoomPage({
       }
       setCameraOn(true);
       setMediaError('');
+
+      // Add video track to all active peer connections
+      const videoTrack = stream.getVideoTracks()[0];
+      if (videoTrack) {
+        peerConnectionsRef.current.forEach((pc, targetId) => {
+          const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
+          if (sender) {
+            sender.replaceTrack(videoTrack);
+          } else {
+            pc.addTrack(videoTrack, stream);
+            // Renegotiate offer
+            pc.createOffer()
+              .then((offer) => pc.setLocalDescription(offer))
+              .then(() => {
+                if (wsRef.current?.readyState === WebSocket.OPEN && pc.localDescription) {
+                  wsRef.current.send(
+                    JSON.stringify({
+                      type: 'offer',
+                      peerId: sessionId,
+                      targetPeerId: targetId,
+                      sdp: pc.localDescription,
+                    })
+                  );
+                }
+              })
+              .catch(() => {});
+          }
+        });
+      }
     } catch {
       setMediaError(
-        'Camera permission was denied. You can still participate with audio.'
+        'Camera permission was denied or device is unavailable. You can still participate with audio.'
       );
     }
   };
@@ -260,6 +446,14 @@ export default function MeetingRoomPage({
       audioStreamRef.current?.getTracks().forEach((t) => t.stop());
       audioStreamRef.current = null;
       setMuted(true);
+
+      // Remove audio track from peer connections
+      peerConnectionsRef.current.forEach((pc) => {
+        const sender = pc.getSenders().find((s) => s.track?.kind === 'audio');
+        if (sender) {
+          pc.removeTrack(sender);
+        }
+      });
       return;
     }
 
@@ -271,9 +465,22 @@ export default function MeetingRoomPage({
       audioStreamRef.current = stream;
       setMuted(false);
       setMediaError('');
+
+      // Add audio track to all active peer connections
+      const audioTrack = stream.getAudioTracks()[0];
+      if (audioTrack) {
+        peerConnectionsRef.current.forEach((pc) => {
+          const sender = pc.getSenders().find((s) => s.track?.kind === 'audio');
+          if (sender) {
+            sender.replaceTrack(audioTrack);
+          } else {
+            pc.addTrack(audioTrack, stream);
+          }
+        });
+      }
     } catch {
       setMediaError(
-        'Microphone permission was denied. You can still participate with video.'
+        'Microphone permission was denied or device is unavailable. You can still participate with video.'
       );
     }
   };
@@ -317,6 +524,8 @@ export default function MeetingRoomPage({
     audioStreamRef.current?.getTracks().forEach((t) => t.stop());
     screenStreamRef.current?.getTracks().forEach((t) => t.stop());
     if (pollRef.current) clearInterval(pollRef.current);
+    peerConnectionsRef.current.forEach((pc) => pc.close());
+    peerConnectionsRef.current.clear();
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       try {
         wsRef.current.close();
@@ -394,7 +603,7 @@ export default function MeetingRoomPage({
         <div style={{ textAlign: 'center', maxWidth: 420, padding: 24 }}>
           <UserX
             size={52}
-            style={{ color: '#ef4444', marginBottom: 16, margin: '0 auto 16px' }}
+            style={{ color: '#ef4444', margin: '0 auto 16px' }}
           />
           <h2 style={{ fontSize: 24, marginBottom: 8, color: '#f87171' }}>
             Removed from meeting
@@ -624,20 +833,26 @@ export default function MeetingRoomPage({
 
           {/* Self video/avatar tile */}
           <div className="tile self">
-            {cameraOn ? (
-              <video
-                ref={videoRef}
-                muted
-                playsInline
-                autoPlay
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                  transform: 'scaleX(-1)',
-                }}
-              />
-            ) : (
+            <video
+              ref={(el) => {
+                videoRef.current = el;
+                if (el && videoStreamRef.current && el.srcObject !== videoStreamRef.current) {
+                  el.srcObject = videoStreamRef.current;
+                  el.play().catch(() => {});
+                }
+              }}
+              muted
+              playsInline
+              autoPlay
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                transform: 'scaleX(-1)',
+                display: cameraOn ? 'block' : 'none',
+              }}
+            />
+            {!cameraOn && (
               <div className="tile-avatar">
                 {getInitial(displayName)}
               </div>
@@ -652,18 +867,56 @@ export default function MeetingRoomPage({
           </div>
 
           {/* Other participants */}
-          {otherPeople.slice(0, 5).map((p) => (
-            <div className="tile" key={p.id}>
-              <div className="tile-avatar">
-                {getInitial(p.display_name)}
+          {otherPeople.slice(0, 5).map((p) => {
+            const remoteStream = remoteStreams[p.session_id];
+            const hasVideo = remoteStream && remoteStream.getVideoTracks().some(
+              (t) => t.enabled && t.readyState === 'live'
+            );
+
+            return (
+              <div className="tile" key={p.id}>
+                {/* Audio element for remote audio */}
+                <audio
+                  autoPlay
+                  ref={(el) => {
+                    if (el && remoteStream && el.srcObject !== remoteStream) {
+                      el.srcObject = remoteStream;
+                      el.play().catch(() => {});
+                    }
+                  }}
+                />
+
+                {/* Video or avatar */}
+                {hasVideo ? (
+                  <video
+                    autoPlay
+                    playsInline
+                    ref={(el) => {
+                      if (el && remoteStream && el.srcObject !== remoteStream) {
+                        el.srcObject = remoteStream;
+                        el.play().catch(() => {});
+                      }
+                    }}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                    }}
+                  />
+                ) : (
+                  <div className="tile-avatar">
+                    {getInitial(p.display_name)}
+                  </div>
+                )}
+
+                <span className="tile-label">
+                  <span className="mic-indicator" />
+                  {p.display_name}
+                  {p.is_host ? ' · Host' : ''}
+                </span>
               </div>
-              <span className="tile-label">
-                <span className="mic-indicator" />
-                {p.display_name}
-                {p.is_host ? ' · Host' : ''}
-              </span>
-            </div>
-          ))}
+            );
+          })}
         </section>
 
         {/* Side panel */}

@@ -26,7 +26,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
       </button>
 
       <div className="profile">
-        <span style={{ fontSize: 13, color: 'var(--muted)' }}>
+        <span style={{ fontSize: 13, color: 'var(--muted)' }} suppressHydrationWarning>
           {getDateString()}
         </span>
         <div className="avatar">AM</div>

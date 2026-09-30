@@ -114,7 +114,7 @@ export default function Dashboard() {
           <div className="hero">
             <div>
               <div className="eyebrow">Your workspace</div>
-              <h1>{getGreeting()}, Alex</h1>
+              <h1 suppressHydrationWarning>{getGreeting()}, Alex</h1>
               <p>Everything you need for your next conversation.</p>
             </div>
             <div className="actions">

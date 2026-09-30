@@ -30,7 +30,7 @@ export function MeetingCard({ meeting, onCopy, onJoin }: MeetingCardProps) {
   return (
     <div className="meeting-card">
       <div className="meeting-main">
-        <div className="date-box">
+        <div className="date-box" suppressHydrationWarning>
           <strong>{dt.getDate()}</strong>
           <span>
             {dt.toLocaleDateString(undefined, { month: 'short' })}
@@ -39,7 +39,7 @@ export function MeetingCard({ meeting, onCopy, onJoin }: MeetingCardProps) {
 
         <div style={{ minWidth: 0 }}>
           <p className="meeting-title">{meeting.title}</p>
-          <div className="meeting-meta">
+          <div className="meeting-meta" suppressHydrationWarning>
             <Clock size={12} />
             {formatDate(meeting.scheduled_time)} at{' '}
             {formatTime(meeting.scheduled_time)} ·{' '}
