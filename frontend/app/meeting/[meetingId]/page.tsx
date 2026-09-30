@@ -37,13 +37,12 @@ function useSearchParams() {
   return new URLSearchParams(window.location.search);
 }
 
-const RTC_CONFIG: RTCConfiguration = {
+const DEFAULT_RTC_CONFIG: RTCConfiguration = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' },
+    { urls: 'stun:stun.cloudflare.com:3478' },
   ],
   iceCandidatePoolSize: 10,
 };
@@ -108,6 +107,11 @@ export default function MeetingRoomPage({
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
 
   // Refs
+  const rtcConfigRef = useRef<RTCConfiguration>(DEFAULT_RTC_CONFIG);
+  const peerNamesRef = useRef<Record<string, string>>({});
+  const loadParticipantsRef = useRef<() => Promise<void>>(async () => {});
+  const hasLoadedInitialParticipantsRef = useRef(false);
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const screenVideoRef = useRef<HTMLVideoElement>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
@@ -136,6 +140,21 @@ export default function MeetingRoomPage({
   displayNameRef.current = displayName;
   const sessionIdRef = useRef(sessionId);
   sessionIdRef.current = sessionId;
+
+  // Load configured STUN/TURN ICE servers on mount
+  useEffect(() => {
+    api.iceServers().then((res) => {
+      if (res?.iceServers && res.iceServers.length > 0) {
+        console.log('[Zooom WebRTC] Received ICE servers from backend:', res.iceServers);
+        rtcConfigRef.current = {
+          iceServers: res.iceServers,
+          iceCandidatePoolSize: 10,
+        };
+      }
+    }).catch((err) => {
+      console.warn('[Zooom WebRTC] Using fallback ICE servers:', err);
+    });
+  }, []);
 
   // ---- AudioContext Helper ----
 
@@ -248,20 +267,24 @@ export default function MeetingRoomPage({
     try {
       const parts = await api.participants(meetingId);
       setPeople(parts);
+      const wasLoaded = hasLoadedInitialParticipantsRef.current;
+      hasLoadedInitialParticipantsRef.current = true;
       setHasLoadedInitialParticipants(true);
 
-      if (sessionIdRef.current) {
+      if (sessionIdRef.current && wasLoaded) {
         const stillInRoom = parts.some(
           (p) => p.session_id === sessionIdRef.current && p.left_at === null
         );
-        if (hasLoadedInitialParticipants && !stillInRoom) {
+        if (!stillInRoom) {
           setKicked(true);
         }
       }
     } catch {
       // Silent fail for polling
     }
-  }, [meetingId, hasLoadedInitialParticipants]);
+  }, [meetingId]);
+
+  loadParticipantsRef.current = loadParticipants;
 
   useEffect(() => {
     loadMeeting();
@@ -358,33 +381,38 @@ export default function MeetingRoomPage({
       return pc;
     }
 
-    pc = new RTCPeerConnection(RTC_CONFIG);
+    console.log(`[Zooom WebRTC] Creating peer connection for ${targetPeerId} (initiator: ${isInitiator})`);
+    pc = new RTCPeerConnection(rtcConfigRef.current || DEFAULT_RTC_CONFIG);
     peerConnectionsRef.current.set(targetPeerId, pc);
 
-    // ONLY the initiator pre-allocates transceivers!
-    // The answerer receives them automatically when setting remote description from the offer
-    if (isInitiator) {
-      const audioTransceiver = pc.addTransceiver('audio', { direction: 'sendrecv' });
-      const videoTransceiver = pc.addTransceiver('video', { direction: 'sendrecv' });
+    // Audio: attach active track or create sendrecv transceiver
+    if (audioStreamRef.current && audioStreamRef.current.getAudioTracks().length > 0) {
+      const aTrack = audioStreamRef.current.getAudioTracks()[0];
+      if (aTrack && aTrack.readyState === 'live') {
+        pc.addTrack(aTrack, audioStreamRef.current);
+      } else {
+        pc.addTransceiver('audio', { direction: 'sendrecv' });
+      }
+    } else {
+      pc.addTransceiver('audio', { direction: 'sendrecv' });
+    }
 
-      // Attach active tracks if present
-      if (audioStreamRef.current && audioStreamRef.current.getAudioTracks().length > 0) {
-        const aTrack = audioStreamRef.current.getAudioTracks()[0];
-        if (aTrack && aTrack.readyState === 'live') {
-          audioTransceiver.sender.replaceTrack(aTrack).catch(console.warn);
-        }
+    // Video: attach active track or create sendrecv transceiver
+    if (videoStreamRef.current && videoStreamRef.current.getVideoTracks().length > 0) {
+      const vTrack = videoStreamRef.current.getVideoTracks()[0];
+      if (vTrack && vTrack.readyState === 'live') {
+        pc.addTrack(vTrack, videoStreamRef.current);
+      } else {
+        pc.addTransceiver('video', { direction: 'sendrecv' });
       }
-      if (videoStreamRef.current && videoStreamRef.current.getVideoTracks().length > 0) {
-        const vTrack = videoStreamRef.current.getVideoTracks()[0];
-        if (vTrack && vTrack.readyState === 'live') {
-          videoTransceiver.sender.replaceTrack(vTrack).catch(console.warn);
-        }
-      }
+    } else {
+      pc.addTransceiver('video', { direction: 'sendrecv' });
     }
 
     // ICE Candidate exchange
     pc.onicecandidate = (event) => {
       if (event.candidate && wsRef.current?.readyState === WebSocket.OPEN) {
+        console.log(`[Zooom WebRTC] Local ICE candidate generated for ${targetPeerId}`);
         wsRef.current.send(
           JSON.stringify({
             type: 'candidate',
@@ -399,7 +427,7 @@ export default function MeetingRoomPage({
     // Receive remote media tracks
     pc.ontrack = (event) => {
       const track = event.track;
-      console.log('Remote track received:', track.kind, track.id, 'from', targetPeerId);
+      console.log(`[Zooom WebRTC] ontrack received: kind=${track.kind}, id=${track.id} from ${targetPeerId}`);
 
       if (!remoteMediaStreamsRef.current[targetPeerId]) {
         remoteMediaStreamsRef.current[targetPeerId] = new MediaStream();
@@ -416,7 +444,25 @@ export default function MeetingRoomPage({
       setRemoteStreams({ ...remoteMediaStreamsRef.current });
       setStreamVersion((v) => v + 1);
 
-      const onTrackChange = () => setStreamVersion((v) => v + 1);
+      // Immediately bind to any existing mounted video and audio elements
+      const vEl = remoteVideoRefs.current.get(targetPeerId);
+      if (vEl && vEl.srcObject !== stream) {
+        vEl.srcObject = stream;
+        vEl.play().catch(() => {});
+      }
+      const aEl = remoteAudioRefs.current.get(targetPeerId);
+      if (aEl && aEl.srcObject !== stream) {
+        aEl.srcObject = stream;
+        aEl.play().catch((err) => {
+          console.warn('[Zooom WebRTC] Remote audio autoplay blocked:', err);
+          setAudioBlocked(true);
+        });
+      }
+
+      const onTrackChange = () => {
+        console.log(`[Zooom WebRTC] Remote track changed (${track.kind}) for ${targetPeerId}: readyState=${track.readyState}, enabled=${track.enabled}`);
+        setStreamVersion((v) => v + 1);
+      };
       track.addEventListener('mute', onTrackChange);
       track.addEventListener('unmute', onTrackChange);
       track.addEventListener('ended', onTrackChange);
@@ -429,10 +475,15 @@ export default function MeetingRoomPage({
     };
 
     pc.oniceconnectionstatechange = () => {
-      console.log(`ICE Connection State for ${targetPeerId}: ${pc.iceConnectionState}`);
+      console.log(`[Zooom WebRTC] ICE connection state for ${targetPeerId}: ${pc.iceConnectionState}`);
       if (pc.iceConnectionState === 'failed') {
+        console.warn(`[Zooom WebRTC] ICE connection failed for ${targetPeerId}, restarting ICE...`);
         pc.restartIce();
       }
+    };
+
+    pc.onconnectionstatechange = () => {
+      console.log(`[Zooom WebRTC] Connection state for ${targetPeerId}: ${pc.connectionState}`);
     };
 
     // If initiator, create and send initial offer
@@ -441,6 +492,7 @@ export default function MeetingRoomPage({
         .then((offer) => pc.setLocalDescription(offer))
         .then(() => {
           if (wsRef.current?.readyState === WebSocket.OPEN && pc.localDescription) {
+            console.log(`[Zooom WebRTC] Sending initial offer to ${targetPeerId}`);
             wsRef.current.send(
               JSON.stringify({
                 type: 'offer',
@@ -451,7 +503,7 @@ export default function MeetingRoomPage({
             );
           }
         })
-        .catch((err) => console.warn('WebRTC offer error:', err));
+        .catch((err) => console.warn(`[Zooom WebRTC] Offer error for ${targetPeerId}:`, err));
     }
 
     return pc;
@@ -460,6 +512,31 @@ export default function MeetingRoomPage({
   // Keep a ref to createPeerConnection so useEffect doesn't tear down on changes
   const createPeerConnectionRef = useRef(createPeerConnection);
   createPeerConnectionRef.current = createPeerConnection;
+
+  // Renegotiate peer helper
+  const renegotiatePeer = useCallback(async (targetPeerId: string, pc: RTCPeerConnection) => {
+    if (pc.signalingState !== 'stable') return;
+    try {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      if (wsRef.current?.readyState === WebSocket.OPEN && pc.localDescription) {
+        console.log(`[Zooom WebRTC] Sending renegotiation offer to ${targetPeerId}`);
+        wsRef.current.send(
+          JSON.stringify({
+            type: 'offer',
+            peerId: sessionIdRef.current,
+            targetPeerId: targetPeerId,
+            sdp: pc.localDescription,
+          })
+        );
+      }
+    } catch (err) {
+      console.warn(`[Zooom WebRTC] Renegotiation offer error for ${targetPeerId}:`, err);
+    }
+  }, []);
+
+  const renegotiatePeerRef = useRef(renegotiatePeer);
+  renegotiatePeerRef.current = renegotiatePeer;
 
   // ---- WebSocket Signaling (Runs ONLY for session lifecycle) ----
 
@@ -473,7 +550,7 @@ export default function MeetingRoomPage({
       wsRef.current = socket;
 
       socket.onopen = () => {
-        console.log('WebSocket connected to Zooom signaling:', wsUrl);
+        console.log('[Zooom WebRTC] WebSocket connected to signaling:', wsUrl);
         socket.send(
           JSON.stringify({
             type: 'join',
@@ -486,6 +563,7 @@ export default function MeetingRoomPage({
       socket.onmessage = async (event) => {
         try {
           const msg = JSON.parse(event.data);
+          console.log(`[Zooom WebRTC] Message received: type=${msg.type}, from=${msg.peerId || 'server'}`);
 
           if (msg.type === 'peers') {
             if (Array.isArray(msg.peerIds)) {
@@ -495,7 +573,7 @@ export default function MeetingRoomPage({
                 }
               });
             }
-            loadParticipants();
+            loadParticipantsRef.current();
 
             if (socket.readyState === WebSocket.OPEN) {
               socket.send(
@@ -508,7 +586,10 @@ export default function MeetingRoomPage({
               );
             }
           } else if (msg.type === 'peer-joined') {
-            loadParticipants();
+            if (msg.peerId && msg.displayName) {
+              peerNamesRef.current[msg.peerId] = msg.displayName;
+            }
+            loadParticipantsRef.current();
             if (socket.readyState === WebSocket.OPEN) {
               socket.send(
                 JSON.stringify({
@@ -525,9 +606,10 @@ export default function MeetingRoomPage({
             if (!pc || pc.signalingState === 'closed') {
               pc = createPeerConnectionRef.current(msg.peerId, false);
             }
+            console.log(`[Zooom WebRTC] Setting remote description (offer) from ${msg.peerId}`);
             await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
 
-            // Attach active local tracks to matched transceivers
+            // Attach active local tracks to matched transceivers/senders
             const vSender = getMediaSender(pc, 'video');
             if (vSender && videoStreamRef.current?.getVideoTracks()[0]) {
               await vSender.replaceTrack(videoStreamRef.current.getVideoTracks()[0]).catch(console.warn);
@@ -539,14 +621,18 @@ export default function MeetingRoomPage({
 
             // Flush pending ICE candidates
             const queued = pendingCandidatesRef.current[msg.peerId] || [];
+            console.log(`[Zooom WebRTC] Flushing ${queued.length} queued ICE candidates for ${msg.peerId}`);
             for (const cand of queued) {
-              await pc.addIceCandidate(new RTCIceCandidate(cand)).catch(console.warn);
+              await pc.addIceCandidate(new RTCIceCandidate(cand)).catch((err) => {
+                console.warn('[Zooom WebRTC] Failed to add buffered ICE candidate:', err);
+              });
             }
             pendingCandidatesRef.current[msg.peerId] = [];
 
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
             if (wsRef.current?.readyState === WebSocket.OPEN && pc.localDescription) {
+              console.log(`[Zooom WebRTC] Sending answer to ${msg.peerId}`);
               wsRef.current.send(
                 JSON.stringify({
                   type: 'answer',
@@ -559,19 +645,26 @@ export default function MeetingRoomPage({
           } else if (msg.type === 'answer') {
             const pc = peerConnectionsRef.current.get(msg.peerId);
             if (pc && pc.signalingState === 'have-local-offer') {
+              console.log(`[Zooom WebRTC] Setting remote description (answer) from ${msg.peerId}`);
               await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
               const queued = pendingCandidatesRef.current[msg.peerId] || [];
+              console.log(`[Zooom WebRTC] Flushing ${queued.length} queued ICE candidates for ${msg.peerId}`);
               for (const cand of queued) {
-                await pc.addIceCandidate(new RTCIceCandidate(cand)).catch(console.warn);
+                await pc.addIceCandidate(new RTCIceCandidate(cand)).catch((err) => {
+                  console.warn('[Zooom WebRTC] Failed to add buffered ICE candidate:', err);
+                });
               }
               pendingCandidatesRef.current[msg.peerId] = [];
             }
           } else if (msg.type === 'candidate') {
             const pc = peerConnectionsRef.current.get(msg.peerId);
-            if (pc && msg.candidate) {
-              if (pc.remoteDescription && pc.remoteDescription.type) {
-                await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)).catch(console.warn);
+            if (msg.candidate) {
+              if (pc && pc.remoteDescription && pc.remoteDescription.type) {
+                await pc.addIceCandidate(new RTCIceCandidate(msg.candidate)).catch((err) => {
+                  console.warn('[Zooom WebRTC] Failed to add incoming ICE candidate:', err);
+                });
               } else {
+                console.log(`[Zooom WebRTC] Buffering early ICE candidate from ${msg.peerId}`);
                 if (!pendingCandidatesRef.current[msg.peerId]) {
                   pendingCandidatesRef.current[msg.peerId] = [];
                 }
@@ -590,6 +683,7 @@ export default function MeetingRoomPage({
               [msg.peerId]: !!msg.speaking,
             }));
           } else if (msg.type === 'peer-left') {
+            console.log(`[Zooom WebRTC] Peer left: ${msg.peerId}`);
             const pc = peerConnectionsRef.current.get(msg.peerId);
             if (pc) {
               pc.close();
@@ -604,6 +698,7 @@ export default function MeetingRoomPage({
               remoteAnalysersRef.current.delete(msg.peerId);
             }
             delete remoteMediaStreamsRef.current[msg.peerId];
+            delete peerNamesRef.current[msg.peerId];
             setRemoteStreams({ ...remoteMediaStreamsRef.current });
             setPeerSpeaking((prev) => {
               const copy = { ...prev };
@@ -615,17 +710,26 @@ export default function MeetingRoomPage({
               delete copy[msg.peerId];
               return copy;
             });
-            loadParticipants();
+            loadParticipantsRef.current();
           }
         } catch (err) {
-          console.warn('WebRTC signaling message handling error:', err);
+          console.warn('[Zooom WebRTC] Signaling message handling error:', err);
         }
       };
-    } catch {
-      // WebSocket fallback
+
+      socket.onerror = (err) => {
+        console.warn('[Zooom WebRTC] WebSocket error:', err);
+      };
+
+      socket.onclose = (event) => {
+        console.log(`[Zooom WebRTC] WebSocket closed: code=${event.code}, reason=${event.reason}`);
+      };
+    } catch (err) {
+      console.warn('[Zooom WebRTC] Failed to initialize WebSocket:', err);
     }
 
     return () => {
+      console.log('[Zooom WebRTC] Cleaning up WebSocket and PeerConnections for session:', sessionId);
       peerConnectionsRef.current.forEach((pc) => pc.close());
       peerConnectionsRef.current.clear();
       pendingCandidatesRef.current = {};
@@ -644,7 +748,7 @@ export default function MeetingRoomPage({
         }
       }
     };
-  }, [sessionId, meetingId, loadParticipants]);
+  }, [sessionId, meetingId]);
 
   // ---- Handle Lobby Direct Join ----
 
@@ -677,7 +781,88 @@ export default function MeetingRoomPage({
     }
   };
 
-  // ---- Media controls (Camera & Mic with replaceTrack) ----
+  // ---- Auto-initialize camera & mic upon entering meeting room ----
+
+  useEffect(() => {
+    if (!sessionId) return;
+    let isMounted = true;
+
+    async function initMedia() {
+      try {
+        console.log('[Zooom WebRTC] Requesting local camera & microphone permissions...');
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' },
+        });
+
+        if (!isMounted) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+
+        console.log('[Zooom WebRTC] Local camera and microphone acquired successfully');
+        videoStreamRef.current = new MediaStream(stream.getVideoTracks());
+        audioStreamRef.current = new MediaStream(stream.getAudioTracks());
+        setCameraOn(true);
+        setMuted(false);
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = videoStreamRef.current;
+          videoRef.current.play().catch(() => {});
+        }
+
+        // Setup local audio analyser for speaking wave
+        const ctx = getOrCreateAudioContext();
+        if (ctx) {
+          try {
+            const source = ctx.createMediaStreamSource(audioStreamRef.current);
+            const analyser = ctx.createAnalyser();
+            analyser.fftSize = 256;
+            analyser.smoothingTimeConstant = 0.4;
+            source.connect(analyser);
+            localAnalyserRef.current = analyser;
+          } catch (e) {
+            console.warn('[Zooom WebRTC] Local audio analyser setup error:', e);
+          }
+        }
+
+        // Update senders on any already established peer connections
+        peerConnectionsRef.current.forEach(async (pc, peerId) => {
+          const vSender = getMediaSender(pc, 'video');
+          const vTrack = stream.getVideoTracks()[0];
+          if (vSender && vTrack) {
+            await vSender.replaceTrack(vTrack).catch(console.warn);
+          }
+          const aSender = getMediaSender(pc, 'audio');
+          const aTrack = stream.getAudioTracks()[0];
+          if (aSender && aTrack) {
+            await aSender.replaceTrack(aTrack).catch(console.warn);
+          }
+        });
+
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.send(
+            JSON.stringify({
+              type: 'media-state',
+              peerId: sessionId,
+              video: true,
+              audio: true,
+            })
+          );
+        }
+      } catch (err) {
+        console.log('[Zooom WebRTC] Initial media acquisition skipped (permission or hardware):', err);
+      }
+    }
+
+    initMedia();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [sessionId, getOrCreateAudioContext]);
+
+  // ---- Media controls (Camera & Mic with replaceTrack & renegotiation) ----
 
   const toggleCamera = async () => {
     if (cameraOn) {
@@ -722,12 +907,13 @@ export default function MeetingRoomPage({
 
       const videoTrack = stream.getVideoTracks()[0];
       if (videoTrack) {
-        peerConnectionsRef.current.forEach((pc) => {
+        peerConnectionsRef.current.forEach(async (pc, peerId) => {
           const vSender = getMediaSender(pc, 'video');
           if (vSender) {
-            vSender.replaceTrack(videoTrack).catch(console.warn);
+            await vSender.replaceTrack(videoTrack).catch(console.warn);
           } else {
             pc.addTrack(videoTrack, stream);
+            await renegotiatePeerRef.current(peerId, pc);
           }
         });
 
@@ -818,12 +1004,13 @@ export default function MeetingRoomPage({
       if (audioTrack) {
         audioTrack.enabled = true;
 
-        peerConnectionsRef.current.forEach((pc) => {
+        peerConnectionsRef.current.forEach(async (pc, peerId) => {
           const aSender = getMediaSender(pc, 'audio');
           if (aSender) {
-            aSender.replaceTrack(audioTrack).catch(console.warn);
+            await aSender.replaceTrack(audioTrack).catch(console.warn);
           } else {
             pc.addTrack(audioTrack, stream!);
+            await renegotiatePeerRef.current(peerId, pc);
           }
         });
 
@@ -840,7 +1027,7 @@ export default function MeetingRoomPage({
               localAnalyserRef.current = analyser;
             }
           } catch (e) {
-            console.warn('Local audio analyser setup error:', e);
+            console.warn('[Zooom WebRTC] Local audio analyser setup error:', e);
           }
         }
 
@@ -868,6 +1055,14 @@ export default function MeetingRoomPage({
       screenStreamRef.current = null;
       if (screenVideoRef.current) screenVideoRef.current.srcObject = null;
       setScreenSharing(false);
+
+      const camTrack = videoStreamRef.current?.getVideoTracks()[0] || null;
+      peerConnectionsRef.current.forEach((pc) => {
+        const vSender = getMediaSender(pc, 'video');
+        if (vSender) {
+          vSender.replaceTrack(camTrack).catch(console.warn);
+        }
+      });
       return;
     }
 
@@ -885,10 +1080,27 @@ export default function MeetingRoomPage({
       setScreenSharing(true);
       setMediaError('');
 
-      stream.getVideoTracks()[0].onended = () => {
-        setScreenSharing(false);
-        screenStreamRef.current = null;
-      };
+      const screenTrack = stream.getVideoTracks()[0];
+      if (screenTrack) {
+        peerConnectionsRef.current.forEach((pc) => {
+          const vSender = getMediaSender(pc, 'video');
+          if (vSender) {
+            vSender.replaceTrack(screenTrack).catch(console.warn);
+          }
+        });
+
+        screenTrack.onended = () => {
+          setScreenSharing(false);
+          screenStreamRef.current = null;
+          const camTrack = videoStreamRef.current?.getVideoTracks()[0] || null;
+          peerConnectionsRef.current.forEach((pc) => {
+            const vSender = getMediaSender(pc, 'video');
+            if (vSender) {
+              vSender.replaceTrack(camTrack).catch(console.warn);
+            }
+          });
+        };
+      }
     } catch {
       // User cancelled screen picker
     }
@@ -1119,9 +1331,33 @@ export default function MeetingRoomPage({
 
   // ---- Grid layout calculation (All participants in mesh) ----
 
-  const otherPeople = people.filter(
-    (p) => p.session_id !== sessionId
-  );
+  // Merge database participants with active WebRTC peers
+  const activePeerIds = new Set<string>();
+  Object.keys(remoteStreams).forEach((id) => activePeerIds.add(id));
+  peerConnectionsRef.current.forEach((_, id) => activePeerIds.add(id));
+  Object.keys(peerMediaState).forEach((id) => activePeerIds.add(id));
+
+  const participantMap = new Map<string, Participant>();
+  people.forEach((p) => {
+    if (p.session_id !== sessionId) {
+      participantMap.set(p.session_id, p);
+    }
+  });
+
+  activePeerIds.forEach((pid) => {
+    if (pid !== sessionId && !participantMap.has(pid)) {
+      participantMap.set(pid, {
+        id: Math.abs(pid.split('').reduce((acc, char) => (acc << 5) - acc + char.charCodeAt(0), 0)),
+        display_name: peerNamesRef.current[pid] || 'Participant',
+        is_host: false,
+        session_id: pid,
+        joined_at: new Date().toISOString(),
+        left_at: null,
+      });
+    }
+  });
+
+  const otherPeople = Array.from(participantMap.values());
   const totalTiles = 1 + otherPeople.length + (screenSharing ? 1 : 0);
   const gridClass =
     totalTiles <= 1

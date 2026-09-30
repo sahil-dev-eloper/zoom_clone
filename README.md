@@ -99,11 +99,20 @@ Open **http://localhost:3000**
 DATABASE_URL=sqlite:///./zoom_clone.db
 FRONTEND_URL=http://localhost:3000
 STUN_SERVER=stun:stun.l.google.com:19302
+
+# Optional TURN configuration for symmetric NATs / strict corporate firewalls
+TURN_SERVER=turn:your-turn-server.com:3478
+TURN_USERNAME=your-turn-username
+TURN_CREDENTIAL=your-turn-password
 ```
+
+> **Security Note on TURN:** Client code never hardcodes or exposes permanent TURN credentials. Instead, the frontend requests dynamic ICE configurations from the backend via `GET /api/ice-servers`, allowing backend-managed rotation and token generation.
 
 #### Frontend (`frontend/.env.example`)
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000
+# Optional custom WebSocket server URL (defaults automatically to ws/wss derived from NEXT_PUBLIC_API_URL):
+# NEXT_PUBLIC_WS_URL=ws://localhost:8000
 ```
 
 Copy `.env.example` to `.env` (backend) or `.env.local` (frontend) to customize.
@@ -124,7 +133,8 @@ Copy `.env.example` to `.env` (backend) or `.env.local` (frontend) to customize.
 | `GET` | `/api/meetings/{meeting_id}/participants` | List active participants |
 | `POST` | `/api/meetings/{meeting_id}/end` | End meeting, mark all participants left |
 | `POST` | `/api/meetings/{meeting_id}/kick` | Host-only: remove a participant |
-| `WS` | `/ws/meetings/{meeting_id}` | WebSocket signaling for WebRTC |
+| `GET` | `/api/ice-servers` | Get configured STUN and TURN ICE servers |
+| `WS` | `/ws/meetings/{meeting_id}` | WebSocket signaling for multi-peer WebRTC |
 
 ### Payload Examples
 

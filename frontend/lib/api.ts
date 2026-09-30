@@ -30,6 +30,10 @@ export function getApiBaseUrl(): string {
 }
 
 export function getWsBaseUrl(meetingId: string): string {
+  const customWs = process.env.NEXT_PUBLIC_WS_URL;
+  if (customWs) {
+    return `${customWs.replace(/\/+$/, '')}/ws/meetings/${meetingId}`;
+  }
   const apiBase = getApiBaseUrl();
   const host = apiBase.replace(/^https?:\/\//, '');
   const wsProto =
@@ -149,6 +153,21 @@ export const api = {
   // ---- Participants ----
   participants: (id: string) =>
     request<Participant[]>(`/api/meetings/${id}/participants`),
+
+  // ---- ICE servers ----
+  iceServers: () =>
+    request<{ iceServers: RTCIceServer[] }>('/api/ice-servers').catch(() => ({
+      iceServers: [
+        {
+          urls: [
+            'stun:stun.l.google.com:19302',
+            'stun:stun1.l.google.com:19302',
+            'stun:stun2.l.google.com:19302',
+            'stun:stun.cloudflare.com:3478',
+          ],
+        },
+      ],
+    })),
 
   // ---- Host controls ----
   kick: (id: string, data: KickPayload) =>

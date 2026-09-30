@@ -429,3 +429,16 @@ class TestRedirects:
         assert "meeting/999888" in resp.headers["location"]
 
 
+# ---- ICE Servers -----------------------------------------------------------
+
+class TestIceServers:
+    def test_get_ice_servers(self, client):
+        resp = client.get("/api/ice-servers")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "iceServers" in data
+        assert len(data["iceServers"]) >= 1
+        assert any("urls" in s for s in data["iceServers"])
+
+
+
