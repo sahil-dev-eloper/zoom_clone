@@ -29,7 +29,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
         <span style={{ fontSize: 13, color: 'var(--muted)' }} suppressHydrationWarning>
           {getDateString()}
         </span>
-        <div className="avatar">AM</div>
+        <div className="avatar">SD</div>
       </div>
     </header>
   );
