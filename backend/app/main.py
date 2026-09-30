@@ -151,14 +151,21 @@ async def signaling(websocket: WebSocket, meeting_id: str):
                         except Exception:
                             pass
 
-            elif msg_type in ("offer", "answer", "candidate"):
-                # Forward to the specific target peer
+            elif msg_type in ("offer", "answer", "candidate", "media-state", "speaking"):
+                # Forward to target peer or broadcast to all other peers in room
                 target = message.get("targetPeerId")
                 if target and target in _rooms[meeting_id]:
                     try:
                         await _rooms[meeting_id][target].send_json(message)
                     except Exception:
                         pass
+                elif not target:
+                    for pid, ws in _rooms[meeting_id].items():
+                        if pid != peer_id:
+                            try:
+                                await ws.send_json(message)
+                            except Exception:
+                                pass
 
             elif msg_type == "leave" and peer_id:
                 _rooms[meeting_id].pop(peer_id, None)
