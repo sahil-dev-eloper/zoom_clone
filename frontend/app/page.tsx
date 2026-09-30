@@ -10,7 +10,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 
-import { api } from '@/lib/api';
+import { api, formatInviteUrl } from '@/lib/api';
 import type { Meeting } from '@/types';
 
 import { Sidebar } from '@/components/Sidebar';
@@ -77,7 +77,8 @@ export default function Dashboard() {
 
   const handleCopy = async (m: Meeting) => {
     try {
-      await navigator.clipboard?.writeText(m.invite_url);
+      const url = formatInviteUrl(m.invite_url, m.meeting_id, m.invite_token);
+      await navigator.clipboard?.writeText(url);
       setToast('Invitation link copied to clipboard');
     } catch {
       setToast('Could not copy link');

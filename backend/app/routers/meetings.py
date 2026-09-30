@@ -28,8 +28,10 @@ router = APIRouter(prefix="/api/meetings", tags=["meetings"])
 # ---------------------------------------------------------------------------
 
 def _base_url(request: Request) -> str:
-    """Derive the frontend base URL from the incoming request."""
-    return str(request.base_url).rstrip("/").replace(":8000", ":3000")
+    """Derive the frontend base URL from client Origin, Referer, env, or cache."""
+    from ..services import get_frontend_base
+
+    return get_frontend_base(request)
 
 
 def _get_meeting(db: Session, meeting_id: str) -> Meeting:

@@ -1,8 +1,11 @@
 """Business logic helpers: ID generation, meeting creation, seeding."""
 
+import os
 import secrets
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
 
+from fastapi import Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -13,6 +16,69 @@ from .models import Meeting, MeetingHistory, Participant
 # limitation.  Any user whose display_name matches HOST_NAME is treated as
 # host for the purpose of join logic.
 HOST_NAME = "Sahil Dargar"
+
+_discovered_frontend_url: str | None = None
+
+
+def record_frontend_origin(request: Request) -> None:
+    """Track the latest client origin seen so redirects can locate the frontend."""
+    global _discovered_frontend_url
+    origin = request.headers.get("origin")
+    if origin and "onrender.com" not in origin:
+        _discovered_frontend_url = origin.rstrip("/")
+        return
+    referer = request.headers.get("referer")
+    if referer:
+        try:
+            p = urlparse(referer)
+            if p.scheme and p.netloc and "onrender.com" not in p.netloc:
+                _discovered_frontend_url = f"{p.scheme}://{p.netloc}"
+        except Exception:
+            pass
+
+
+def get_frontend_base(request: Request) -> str:
+    """Derive the frontend base URL from client Origin, Referer, env, or cache."""
+    record_frontend_origin(request)
+
+    # 1. Prefer client Origin header (from browser fetch requests)
+    origin = request.headers.get("origin")
+    if origin and "onrender.com" not in origin:
+        return origin.rstrip("/")
+
+    # 2. Check FRONTEND_URL environment variable if set to external domain
+    frontend_env = os.getenv("FRONTEND_URL")
+    if (
+        frontend_env
+        and "localhost" not in frontend_env
+        and "127.0.0.1" not in frontend_env
+        and "onrender.com" not in frontend_env
+    ):
+        return frontend_env.rstrip("/")
+
+    # 3. Check Referer header (e.g. from Vercel deployment)
+    referer = request.headers.get("referer")
+    if referer:
+        try:
+            p = urlparse(referer)
+            if p.scheme and p.netloc and "onrender.com" not in p.netloc:
+                return f"{p.scheme}://{p.netloc}"
+        except Exception:
+            pass
+
+    # 4. Check cached/discovered frontend origin from prior frontend API calls
+    global _discovered_frontend_url
+    if _discovered_frontend_url:
+        return _discovered_frontend_url
+
+    # 5. Check if request came from local dev
+    if origin and ("localhost" in origin or "127.0.0.1" in origin):
+        return origin.rstrip("/")
+
+    # 6. Fallback from environment or local default
+    if frontend_env and "onrender.com" not in frontend_env:
+        return frontend_env.rstrip("/")
+    return str(request.base_url).rstrip("/").replace(":8000", ":3000")
 
 
 def meeting_out(meeting: Meeting, base_url: str) -> dict:

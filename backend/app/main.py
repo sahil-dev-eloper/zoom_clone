@@ -11,12 +11,12 @@ import json
 import os
 from collections import defaultdict
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from .database import Base, SessionLocal, engine
 from .routers.meetings import router
-from .services import seed_meetings
+from .services import get_frontend_base, record_frontend_origin, seed_meetings
 
 from contextlib import asynccontextmanager
 
@@ -63,6 +63,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def track_frontend_origin_middleware(request: Request, call_next):
+    record_frontend_origin(request)
+    return await call_next(request)
+
+
 app.include_router(router)
 
 
@@ -85,6 +91,28 @@ def root():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/join")
+def redirect_join(request: Request):
+    from starlette.responses import RedirectResponse
+    base = get_frontend_base(request)
+    query = str(request.url.query)
+    target = f"{base}/join"
+    if query:
+        target += f"?{query}"
+    return RedirectResponse(url=target, status_code=307)
+
+
+@app.get("/meeting/{meeting_id}")
+def redirect_meeting(meeting_id: str, request: Request):
+    from starlette.responses import RedirectResponse
+    base = get_frontend_base(request)
+    query = str(request.url.query)
+    target = f"{base}/meeting/{meeting_id}"
+    if query:
+        target += f"?{query}"
+    return RedirectResponse(url=target, status_code=307)
 
 
 # ---------------------------------------------------------------------------

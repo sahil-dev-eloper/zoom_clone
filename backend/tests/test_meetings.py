@@ -412,3 +412,20 @@ class TestWebSocketSignaling:
             assert left_event["type"] == "peer-left"
             assert left_event["peerId"] == "peer2"
 
+
+# ---- Redirects -------------------------------------------------------------
+
+class TestRedirects:
+    def test_redirect_join_preserves_query(self, client):
+        resp = client.get(
+            "/join?meeting=999888&token=test_token", follow_redirects=False
+        )
+        assert resp.status_code == 307
+        assert "join?meeting=999888&token=test_token" in resp.headers["location"]
+
+    def test_redirect_meeting_path(self, client):
+        resp = client.get("/meeting/999888", follow_redirects=False)
+        assert resp.status_code == 307
+        assert "meeting/999888" in resp.headers["location"]
+
+

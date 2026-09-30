@@ -20,7 +20,7 @@ import {
   Check,
 } from 'lucide-react';
 
-import { api, getWsBaseUrl } from '@/lib/api';
+import { api, formatInviteUrl, getWsBaseUrl } from '@/lib/api';
 import type { Meeting, Participant } from '@/types';
 import { Brand } from '@/components/Brand';
 
@@ -960,7 +960,12 @@ export default function MeetingRoomPage({
   const copyInvite = async () => {
     if (!meeting) return;
     try {
-      await navigator.clipboard?.writeText(meeting.invite_url);
+      const url = formatInviteUrl(
+        meeting.invite_url,
+        meeting.meeting_id,
+        meeting.invite_token
+      );
+      await navigator.clipboard?.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -1466,7 +1471,11 @@ export default function MeetingRoomPage({
               <div className="invite-input-row">
                 <input
                   readOnly
-                  value={meeting.invite_url}
+                  value={formatInviteUrl(
+                    meeting.invite_url,
+                    meeting.meeting_id,
+                    meeting.invite_token
+                  )}
                   onClick={(e) => (e.target as HTMLInputElement).select()}
                   aria-label="Invitation URL"
                 />

@@ -62,30 +62,78 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body;
 }
 
+export function formatInviteUrl(
+  inviteUrl?: string,
+  meetingId?: string,
+  token?: string
+): string {
+  if (typeof window !== 'undefined') {
+    const origin = window.location.origin;
+    if (inviteUrl) {
+      try {
+        const u = new URL(inviteUrl);
+        return `${origin}${u.pathname}${u.search}`;
+      } catch {
+        // Ignore parsing errors and fallback
+      }
+    }
+    if (meetingId) {
+      return `${origin}/join?meeting=${meetingId}${token ? `&token=${token}` : ''}`;
+    }
+  }
+  return inviteUrl || '';
+}
+
+export function sanitizeMeeting(m: Meeting): Meeting {
+  if (!m) return m;
+  return {
+    ...m,
+    invite_url: formatInviteUrl(m.invite_url, m.meeting_id, m.invite_token),
+  };
+}
+
 export const api = {
   // ---- Dashboard ----
-  upcoming: () => request<Meeting[]>('/api/meetings/upcoming'),
-  recent: () => request<Meeting[]>('/api/meetings/recent'),
+  upcoming: async () => {
+    const list = await request<Meeting[]>('/api/meetings/upcoming');
+    return list.map(sanitizeMeeting);
+  },
+  recent: async () => {
+    const list = await request<Meeting[]>('/api/meetings/recent');
+    return list.map(sanitizeMeeting);
+  },
 
   // ---- Create ----
-  instant: () =>
-    request<Meeting>('/api/meetings/instant', { method: 'POST' }),
+  instant: async () => {
+    const m = await request<Meeting>('/api/meetings/instant', { method: 'POST' });
+    return sanitizeMeeting(m);
+  },
 
-  schedule: (data: SchedulePayload) =>
-    request<Meeting>('/api/meetings/schedule', {
+  schedule: async (data: SchedulePayload) => {
+    const m = await request<Meeting>('/api/meetings/schedule', {
       method: 'POST',
       body: JSON.stringify(data),
-    }),
+    });
+    return sanitizeMeeting(m);
+  },
 
   // ---- Meeting details ----
-  details: (id: string) => request<Meeting>(`/api/meetings/${id}`),
+  details: async (id: string) => {
+    const m = await request<Meeting>(`/api/meetings/${id}`);
+    return sanitizeMeeting(m);
+  },
 
   // ---- Join / Leave / End ----
-  join: (data: JoinPayload) =>
-    request<JoinResult>('/api/meetings/join', {
+  join: async (data: JoinPayload) => {
+    const result = await request<JoinResult>('/api/meetings/join', {
       method: 'POST',
       body: JSON.stringify(data),
-    }),
+    });
+    return {
+      ...result,
+      meeting: sanitizeMeeting(result.meeting),
+    };
+  },
 
   leave: (id: string, session_id: string) =>
     request<{ ok: boolean }>(`/api/meetings/${id}/leave`, {
@@ -93,8 +141,10 @@ export const api = {
       body: JSON.stringify({ session_id }),
     }),
 
-  end: (id: string) =>
-    request<Meeting>(`/api/meetings/${id}/end`, { method: 'POST' }),
+  end: async (id: string) => {
+    const m = await request<Meeting>(`/api/meetings/${id}/end`, { method: 'POST' });
+    return sanitizeMeeting(m);
+  },
 
   // ---- Participants ----
   participants: (id: string) =>
