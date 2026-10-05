@@ -104,6 +104,28 @@ export function sanitizeMeeting(m: Meeting): Meeting {
   };
 }
 
+export function saveRecentMeetingId(meetingId: string) {
+  if (typeof window === 'undefined' || !meetingId) return;
+  try {
+    const cleanId = meetingId.replace(/\s+/g, '');
+    const raw = localStorage.getItem('zoom_recent_meeting_ids') || '[]';
+    const list: string[] = JSON.parse(raw);
+    const filtered = list.filter((id) => id !== cleanId);
+    filtered.unshift(cleanId);
+    localStorage.setItem('zoom_recent_meeting_ids', JSON.stringify(filtered.slice(0, 20)));
+  } catch {}
+}
+
+export function getRecentMeetingIds(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem('zoom_recent_meeting_ids') || '[]';
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
 export const api = {
   // ---- Dashboard ----
   upcoming: async () => {
@@ -111,13 +133,18 @@ export const api = {
     return list.map(sanitizeMeeting);
   },
   recent: async () => {
-    const list = await request<Meeting[]>('/api/meetings/recent');
+    const recentIds = getRecentMeetingIds();
+    const query = recentIds.length > 0 ? `?meeting_ids=${encodeURIComponent(recentIds.join(','))}` : '';
+    const list = await request<Meeting[]>(`/api/meetings/recent${query}`);
     return list.map(sanitizeMeeting);
   },
 
   // ---- Create ----
   instant: async () => {
     const m = await request<Meeting>('/api/meetings/instant', { method: 'POST' });
+    if (m?.meeting_id) {
+      saveRecentMeetingId(m.meeting_id);
+    }
     return sanitizeMeeting(m);
   },
 
@@ -126,6 +153,9 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    if (m?.meeting_id) {
+      saveRecentMeetingId(m.meeting_id);
+    }
     return sanitizeMeeting(m);
   },
 
@@ -141,6 +171,9 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    if (result.meeting?.meeting_id) {
+      saveRecentMeetingId(result.meeting.meeting_id);
+    }
     return {
       ...result,
       meeting: sanitizeMeeting(result.meeting),

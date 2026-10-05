@@ -40,7 +40,7 @@ export default function ZoomWorkplaceDashboard() {
   const [notesOpen, setNotesOpen] = useState(false);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authPromptConfig, setAuthPromptConfig] = useState<{ title?: string; subtitle?: string }>({});
-  const [pendingAfterAuth, setPendingAfterAuth] = useState<'schedule' | null>(null);
+  const [pendingAfterAuth, setPendingAfterAuth] = useState<'schedule' | 'instant' | null>(null);
   const [joinDefaultId, setJoinDefaultId] = useState('');
   const [toast, setToast] = useState('');
 
@@ -62,6 +62,11 @@ export default function ZoomWorkplaceDashboard() {
     if (pendingAfterAuth === 'schedule') {
       setPendingAfterAuth(null);
       setScheduleModalOpen(true);
+    } else if (pendingAfterAuth === 'instant') {
+      setPendingAfterAuth(null);
+      setTimeout(() => {
+        handleStartInstant();
+      }, 50);
     }
   };
 
@@ -84,10 +89,20 @@ export default function ZoomWorkplaceDashboard() {
 
   useEffect(() => {
     loadMeetings();
-  }, [loadMeetings]);
+  }, [loadMeetings, isLoggedIn, user?.id]);
 
   // Start instant meeting
   const handleStartInstant = async () => {
+    if (!isLoggedIn) {
+      setAuthPromptConfig({
+        title: 'Sign in to Start Meeting',
+        subtitle: 'Please sign in or create an account to start an instant meeting and access your meeting history.',
+      });
+      setPendingAfterAuth('instant');
+      setAuthModalOpen(true);
+      return;
+    }
+
     const curUser = getStoredUser();
     const hostName = curUser?.display_name || 'Sahil Dargar';
     try {
@@ -96,16 +111,16 @@ export default function ZoomWorkplaceDashboard() {
       const joined = await api.join({
         meeting_id: m.meeting_id,
         display_name: hostName,
+        is_host: true,
       });
       window.location.href = `/meeting/${m.meeting_id}?session=${joined.session_id}&name=${encodeURIComponent(hostName)}&host=true`;
-    } catch (e) {
-      // Fallback: create client-side room if backend offline
-      const mockId = Math.floor(100000 + Math.random() * 900000).toString();
-      window.location.href = `/meeting/${mockId}?session=sess_${Date.now()}&name=${encodeURIComponent(hostName)}&host=true`;
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Could not start meeting';
+      setToast(msg);
     }
   };
 
-  // Launch specific meeting by ID (e.g. scheduled)
+  // Launch specific meeting by ID (e.g. scheduled or rejoin from recents)
   const handleStartMeetingById = async (id: string) => {
     const cleanId = id.replace(/\s+/g, '');
     const found = upcoming.find((m) => m.meeting_id === cleanId) || recent.find((m) => m.meeting_id === cleanId);
@@ -120,9 +135,15 @@ export default function ZoomWorkplaceDashboard() {
         meeting_id: cleanId,
         display_name: hostName,
       });
-      window.location.href = `/meeting/${cleanId}?session=${joined.session_id}&name=${encodeURIComponent(hostName)}&host=true`;
-    } catch (e) {
-      window.location.href = `/meeting/${id.replace(/\s+/g, '')}?session=sess_${Date.now()}&name=${encodeURIComponent(hostName)}&host=true`;
+      window.location.href = `/meeting/${cleanId}?session=${joined.session_id}&name=${encodeURIComponent(hostName)}&host=${joined.is_host}`;
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Could not join meeting';
+      if (msg.toLowerCase().includes('ended')) {
+        setToast('This meeting has ended and is no longer available.');
+        loadMeetings();
+        return;
+      }
+      setToast(msg);
     }
   };
 

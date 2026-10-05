@@ -87,7 +87,7 @@ export function AuthModal({
         className="zoom-auth-modal"
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: 440,
+          width: 'min(440px, calc(100vw - 28px))',
           background: '#FFFFFF',
           borderRadius: 12,
           boxShadow: '0 20px 50px rgba(0,0,0,0.25)',

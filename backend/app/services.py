@@ -126,6 +126,7 @@ def create_meeting(
     duration: int,
     base_url: str,
     status: str = "scheduled",
+    is_seed: bool = False,
 ) -> dict:
     """Insert a new meeting and its initial history entry."""
     meeting_id, token = unique_ids(db)
@@ -139,6 +140,7 @@ def create_meeting(
         duration_minutes=duration,
         status=status,
         created_at=utcnow(),
+        is_seed=is_seed,
     )
     db.add(meeting)
     db.flush()
@@ -241,6 +243,12 @@ def seed_meetings(db: Session, base_url: str, force: bool = False) -> None:
         db.execute(delete(MeetingHistory))
         db.execute(delete(Meeting).where(Meeting.user_id.is_(None)))
         db.commit()
+
+    # Ensure existing seeded demo meetings have is_seed = True
+    seed_titles = [item[0] for item in _SEED]
+    for m in db.scalars(select(Meeting).where(Meeting.title.in_(seed_titles))).all():
+        m.is_seed = True
+    db.commit()
 
     # Check upcoming count
     upcoming_count = db.scalar(

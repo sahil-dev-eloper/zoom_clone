@@ -376,7 +376,7 @@ export function HomeView({
                     </div>
                     <div className="zoom-scheduled-info">
                       <h4>{m.title}</h4>
-                      <p>Meeting ID: {m.meeting_id} • {m.duration_minutes} min</p>
+                      <p>Meeting ID: {m.meeting_id} • {m.duration_minutes ? `${m.duration_minutes} min` : 'N/A'}</p>
                     </div>
                     <div className="zoom-scheduled-actions">
                       <button

@@ -823,6 +823,11 @@ export default function MeetingRoomPage({
             // Immediately drop from participants list so stage and drawer update with zero delay
             setPeople((prev) => prev.filter((p) => p.session_id !== msg.peerId));
             loadParticipantsRef.current();
+          } else if (msg.type === 'meeting-ended') {
+            alert('The host has ended this meeting for all participants.');
+            cleanup();
+            window.location.href = '/';
+            return;
           }
         } catch (err) {
           console.warn('[Zooom WebRTC] Signaling message handling error:', err);
@@ -887,7 +892,12 @@ export default function MeetingRoomPage({
       setMeeting(res.meeting);
       const newUrl = `/meeting/${meetingId}?session=${res.session_id}&name=${encodeURIComponent(nameToUse)}${res.is_host ? '&host=true' : ''}`;
       window.history.replaceState(null, '', newUrl);
-    } catch {
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : '';
+      if (errMsg.toLowerCase().includes('ended')) {
+        setError('This meeting has ended and is no longer available.');
+        return;
+      }
       // Fallback local session if backend offline or meeting was client-created
       const mockSession = 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
       setSessionId(mockSession);
@@ -1319,6 +1329,13 @@ export default function MeetingRoomPage({
   const handleEnd = async () => {
     setLeaving(true);
     try {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(
+          JSON.stringify({
+            type: 'meeting-ended',
+          })
+        );
+      }
       await api.end(meetingId);
     } catch {
       // best effort
@@ -1641,7 +1658,7 @@ export default function MeetingRoomPage({
   // ---- Render: Active Zoom Meeting Room matching Reference Interface ----
 
   return (
-    <div className="zoom-workplace-app">
+    <div className="zoom-workplace-app zoom-meeting-page-root">
       {/* Zoom Workplace Topbar */}
       <ZoomHeader
         onNavigateTab={(tab) => {

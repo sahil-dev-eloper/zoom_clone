@@ -245,7 +245,7 @@ async def signaling(websocket: WebSocket, meeting_id: str):
                         except Exception as e:
                             logger.warning(f"[Signaling] Failed to send peer-joined to {pid}: {e}")
 
-            elif msg_type in ("offer", "answer", "candidate", "media-state", "speaking", "mute-peer", "mute-all"):
+            elif msg_type in ("offer", "answer", "candidate", "media-state", "speaking", "mute-peer", "mute-all", "meeting-ended"):
                 target = message.get("targetPeerId")
                 if target and target in _rooms[meeting_id]:
                     try:

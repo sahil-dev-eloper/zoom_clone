@@ -10,6 +10,7 @@ import {
   Plus,
   Video,
   History,
+  ChevronLeft,
 } from 'lucide-react';
 import type { Meeting } from '@/types';
 import { isSeedMeeting } from '@/types';
@@ -32,6 +33,7 @@ export function MeetingsView({
   onOpenSchedule,
 }: MeetingsViewProps) {
   const [activeTab, setActiveTab] = useState<'upcoming' | 'recent'>('upcoming');
+  const [mobileView, setMobileView] = useState<'list' | 'detail'>('list');
   const [selectedMeetingId, setSelectedMeetingId] = useState<string>(() => {
     return upcomingMeetings[0]?.meeting_id || recentMeetings[0]?.meeting_id || '';
   });
@@ -88,7 +90,7 @@ Passcode: ${selectedMeeting.invite_token || '123456'}`;
   };
 
   return (
-    <div className="zoom-meetings-layout">
+    <div className={`zoom-meetings-layout mobile-view-${mobileView}`}>
       {/* Left Meetings Sidebar Pane */}
       <div className="zoom-meetings-sidebar">
         {/* Top Header */}
@@ -163,7 +165,10 @@ Passcode: ${selectedMeeting.invite_token || '123456'}`;
                     <div
                       key={m.meeting_id}
                       className={`zoom-upcoming-item ${isSelected ? 'active' : ''}`}
-                      onClick={() => setSelectedMeetingId(m.meeting_id)}
+                      onClick={() => {
+                        setSelectedMeetingId(m.meeting_id);
+                        setMobileView('detail');
+                      }}
                     >
                       <div className="item-time">
                         <Clock size={13} />
@@ -203,7 +208,10 @@ Passcode: ${selectedMeeting.invite_token || '123456'}`;
                     <div
                       key={m.meeting_id}
                       className={`zoom-upcoming-item ${isSelected ? 'active' : ''}`}
-                      onClick={() => setSelectedMeetingId(m.meeting_id)}
+                      onClick={() => {
+                        setSelectedMeetingId(m.meeting_id);
+                        setMobileView('detail');
+                      }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
                         <div className="item-time" style={{ color: isActive ? '#15803D' : '#64748B' }}>
@@ -221,7 +229,7 @@ Passcode: ${selectedMeeting.invite_token || '123456'}`;
                       </div>
                       <div className="item-title">{m.title}</div>
                       <div className="item-sub">
-                        {m.duration_minutes ? `${m.duration_minutes} mins • ` : ''}ID: {m.meeting_id}
+                        {m.duration_minutes ? `${m.duration_minutes} mins • ` : 'Duration: N/A • '}ID: {m.meeting_id}
                       </div>
                     </div>
                   );
@@ -245,6 +253,19 @@ Passcode: ${selectedMeeting.invite_token || '123456'}`;
 
       {/* Right Meeting Detail Pane */}
       <div className="zoom-meetings-main">
+        {/* Mobile Back Button */}
+        <div className="zoom-meetings-mobile-back-row">
+          <button
+            type="button"
+            className="zoom-mobile-back-btn"
+            onClick={() => setMobileView('list')}
+            aria-label="Back to meetings list"
+          >
+            <ChevronLeft size={16} />
+            <span>Back to {activeTab === 'upcoming' ? 'Upcoming' : 'Recent'}</span>
+          </button>
+        </div>
+
         {selectedMeeting ? (
           activeTab === 'recent' ? (
             /* RECENT MEETINGS: Pure History Record / Rejoin only if still in progress */
@@ -287,7 +308,7 @@ Passcode: ${selectedMeeting.invite_token || '123456'}`;
                   >
                     <Clock size={14} />
                     <span>
-                      Held on {new Date(selectedMeeting.ended_at || selectedMeeting.scheduled_time).toLocaleString()} • {selectedMeeting.duration_minutes} mins
+                      Held on {new Date(selectedMeeting.ended_at || selectedMeeting.scheduled_time).toLocaleString()} • {selectedMeeting.duration_minutes ? `${selectedMeeting.duration_minutes} mins` : 'N/A'}
                     </span>
                   </div>
 
@@ -308,7 +329,7 @@ Passcode: ${selectedMeeting.invite_token || '123456'}`;
                     </div>
                     <div className="zoom-history-row">
                       <span className="zoom-history-label">Duration</span>
-                      <span className="zoom-history-val">{selectedMeeting.duration_minutes} minutes</span>
+                      <span className="zoom-history-val">{selectedMeeting.duration_minutes ? `${selectedMeeting.duration_minutes} minutes` : 'N/A'}</span>
                     </div>
                     <div className="zoom-history-row">
                       <span className="zoom-history-label">Meeting ID</span>
@@ -337,7 +358,7 @@ Passcode: ${selectedMeeting.invite_token || '123456'}`;
               <div className="zoom-meeting-meta-badge">
                 <Clock size={14} />
                 <span>
-                  {new Date(selectedMeeting.scheduled_time).toLocaleString()} • {selectedMeeting.duration_minutes} mins
+                  {new Date(selectedMeeting.scheduled_time).toLocaleString()} • {selectedMeeting.duration_minutes ? `${selectedMeeting.duration_minutes} mins` : 'N/A'}
                 </span>
               </div>
 
