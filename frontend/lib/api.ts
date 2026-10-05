@@ -6,6 +6,8 @@
  */
 
 import type {
+  AuthResult,
+  AuthUser,
   JoinPayload,
   JoinResult,
   KickPayload,
@@ -47,12 +49,21 @@ export function getWsBaseUrl(meetingId: string): string {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const base = getApiBaseUrl();
   const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(init?.headers as Record<string, string> || {}),
+  };
+
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('zoom_auth_token');
+    if (token && !headers['Authorization']) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  }
+
   const response = await fetch(`${base}${cleanPath}`, {
     ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers || {}),
-    },
+    headers,
   });
 
   const body = await response.json().catch(() => ({}));
@@ -73,16 +84,13 @@ export function formatInviteUrl(
 ): string {
   if (typeof window !== 'undefined') {
     const origin = window.location.origin;
-    if (inviteUrl) {
-      try {
-        const u = new URL(inviteUrl);
-        return `${origin}${u.pathname}${u.search}`;
-      } catch {
-        // Ignore parsing errors and fallback
-      }
+    let cleanId = (meetingId || '').replace(/\s+/g, '');
+    if (!cleanId && inviteUrl) {
+      const match = inviteUrl.match(/meeting[=/]([a-zA-Z0-9_-]+)/);
+      if (match) cleanId = match[1];
     }
-    if (meetingId) {
-      return `${origin}/join?meeting=${meetingId}${token ? `&token=${token}` : ''}`;
+    if (cleanId) {
+      return `${origin}/join?meeting=${cleanId}${token ? `&token=${token}` : ''}`;
     }
   }
   return inviteUrl || '';
@@ -175,4 +183,24 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+
+  // ---- Authentication ----
+  auth: {
+    login: (email: string, password: string) =>
+      request<AuthResult>('/api/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      }),
+    register: (email: string, password: string, display_name: string) =>
+      request<AuthResult>('/api/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ email, password, display_name }),
+      }),
+    me: () => request<AuthUser>('/api/auth/me'),
+    updateProfile: (display_name: string) =>
+      request<AuthUser>('/api/auth/profile', {
+        method: 'PUT',
+        body: JSON.stringify({ display_name }),
+      }),
+  },
 };

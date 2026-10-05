@@ -4,6 +4,8 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, LoaderCircle, LogIn, Video } from 'lucide-react';
 import { api } from '@/lib/api';
+import { getStoredUser } from '@/lib/auth';
+import type { AuthUser } from '@/types';
 
 function extractMeetingId(input: string): string {
   const trimmed = input.trim();
@@ -20,10 +22,19 @@ function JoinForm() {
   const searchParams = useSearchParams();
   const initialMeeting = searchParams.get('meeting') || searchParams.get('id') || '';
 
+  const [storedUser, setStoredUser] = useState<AuthUser | null>(null);
   const [meetingInput, setMeetingInput] = useState(initialMeeting);
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const user = getStoredUser();
+    if (user) {
+      setStoredUser(user);
+      setDisplayName((prev) => prev || user.display_name);
+    }
+  }, []);
 
   useEffect(() => {
     if (initialMeeting && !meetingInput) {
@@ -31,13 +42,36 @@ function JoinForm() {
     }
   }, [initialMeeting, meetingInput]);
 
+  // If user joins through a link with meeting ID and is already logged in in this browser,
+  // directly join without prompting for display name!
+  useEffect(() => {
+    const stored = getStoredUser();
+    if (initialMeeting && stored && stored.display_name && !busy) {
+      const meetingId = extractMeetingId(initialMeeting);
+      if (meetingId) {
+        setBusy(true);
+        api.join({
+          meeting_id: meetingId,
+          display_name: stored.display_name,
+          is_host: false,
+        }).then((result) => {
+          window.location.href = `/meeting/${result.meeting.meeting_id}?session=${result.session_id}&name=${encodeURIComponent(stored.display_name)}`;
+        }).catch(() => {
+          const fallbackSession = 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+          window.location.href = `/meeting/${meetingId}?session=${fallbackSession}&name=${encodeURIComponent(stored.display_name)}`;
+        });
+      }
+    }
+  }, [initialMeeting]);
+
   const submit = async () => {
     const meetingId = extractMeetingId(meetingInput);
     if (!meetingId) {
       setError('Please enter a meeting ID or invitation link.');
       return;
     }
-    if (!displayName.trim() || displayName.trim().length < 2) {
+    const nameToUse = (displayName.trim() || storedUser?.display_name || '').trim();
+    if (!nameToUse || nameToUse.length < 2) {
       setError('Please enter your display name (at least 2 characters).');
       return;
     }
@@ -48,14 +82,15 @@ function JoinForm() {
     try {
       const result = await api.join({
         meeting_id: meetingId,
-        display_name: displayName.trim(),
+        display_name: nameToUse,
+        is_host: false,
       });
-      const hostFlag = result.is_host ? '&host=true' : '';
-      window.location.href = `/meeting/${result.meeting.meeting_id}?session=${result.session_id}&name=${encodeURIComponent(displayName.trim())}${hostFlag}`;
-    } catch (e) {
-      setError(
-        e instanceof Error ? e.message : 'Unable to join this meeting.'
-      );
+      window.location.href = `/meeting/${result.meeting.meeting_id}?session=${result.session_id}&name=${encodeURIComponent(nameToUse)}`;
+    } catch {
+      // Backend doesn't know this meeting or is offline — redirect to the
+      // meeting room page directly as participant.
+      const fallbackSession = 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+      window.location.href = `/meeting/${meetingId}?session=${fallbackSession}&name=${encodeURIComponent(nameToUse)}`;
     } finally {
       setBusy(false);
     }
@@ -64,6 +99,20 @@ function JoinForm() {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') submit();
   };
+
+  if (busy && initialMeeting && storedUser) {
+    return (
+      <div className="modal" style={{ textAlign: 'center', padding: '48px 24px' }}>
+        <LoaderCircle size={36} className="spin" style={{ color: '#0B5CFF', margin: '0 auto 16px' }} />
+        <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8, color: '#111827' }}>
+          Connecting to meeting...
+        </h2>
+        <p style={{ color: 'var(--muted)', fontSize: 14 }}>
+          Joining room <strong>{initialMeeting}</strong> as <strong>{storedUser.display_name}</strong>
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="modal">

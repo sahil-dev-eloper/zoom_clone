@@ -41,6 +41,7 @@ class MeetingOut(BaseModel):
     ended_at: Optional[datetime] = None
     invite_url: str
     participant_count: int = 0
+    is_seed: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -61,6 +62,7 @@ class JoinRequest(BaseModel):
     meeting_id: str = Field(min_length=3, max_length=64)
     display_name: str = Field(min_length=2, max_length=100)
     session_id: Optional[str] = None
+    is_host: Optional[bool] = None
 
 
 class JoinOut(BaseModel):
@@ -105,3 +107,45 @@ class KickRequest(BaseModel):
     """Body for host-only participant removal."""
     host_session_id: str
     participant_id: int
+
+
+# ---------------------------------------------------------------------------
+# Authentication
+# ---------------------------------------------------------------------------
+
+class UserRegisterRequest(BaseModel):
+    email: str = Field(min_length=5, max_length=160)
+    password: str = Field(min_length=6, max_length=100)
+    display_name: str = Field(min_length=2, max_length=100)
+
+
+class UserLoginRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=160)
+    password: str = Field(min_length=1, max_length=100)
+
+
+class UserUpdateRequest(BaseModel):
+    display_name: Optional[str] = Field(default=None, min_length=2, max_length=100)
+
+
+class UserOut(BaseModel):
+    id: int
+    email: str
+    display_name: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+    @field_serializer("created_at", when_used="json")
+    def serialize_utc_datetime(self, v: Optional[datetime]) -> Optional[str]:
+        if v is None:
+            return None
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
+        return v.isoformat()
+
+
+class AuthResponse(BaseModel):
+    token: str
+    user: UserOut
+

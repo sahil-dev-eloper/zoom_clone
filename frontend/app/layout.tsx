@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Zooom | Modern Meeting Workspace',
+  title: 'Zoom Workplace',
   description:
-    'A polished, Zoom-inspired meeting workspace. Create, schedule, and join meetings with real-time video, audio, and collaboration.',
+    'Zoom Workplace modern video meeting, team chat, calendar, and collaboration workspace.',
 };
 
 export default function RootLayout({
@@ -13,8 +13,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" suppressHydrationWarning>
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }

@@ -11,6 +11,22 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .database import Base
 
 
+class User(Base):
+    """A registered user account."""
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    email: Mapped[str] = mapped_column(String(160), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255))
+    display_name: Mapped[str] = mapped_column(String(100))
+    pmi: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime)
+
+    meetings: Mapped[list["Meeting"]] = relationship(back_populates="user")
+    participants: Mapped[list["Participant"]] = relationship(back_populates="user")
+
+
 class Meeting(Base):
     """A video-conference meeting room."""
 
@@ -30,6 +46,12 @@ class Meeting(Base):
     status: Mapped[str] = mapped_column(String(20), default="scheduled", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime)
     ended_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    is_seed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
+
+    user_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    user: Mapped[Optional["User"]] = relationship(back_populates="meetings")
 
     participants: Mapped[list["Participant"]] = relationship(
         back_populates="meeting", cascade="all, delete-orphan"
@@ -48,6 +70,9 @@ class Participant(Base):
     meeting_id: Mapped[int] = mapped_column(
         ForeignKey("meetings.id", ondelete="CASCADE"), index=True
     )
+    user_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     display_name: Mapped[str] = mapped_column(String(100))
     is_host: Mapped[bool] = mapped_column(Boolean, default=False)
     joined_at: Mapped[datetime] = mapped_column(DateTime)
@@ -55,6 +80,7 @@ class Participant(Base):
     session_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
 
     meeting: Mapped[Meeting] = relationship(back_populates="participants")
+    user: Mapped[Optional["User"]] = relationship(back_populates="participants")
 
 
 class MeetingHistory(Base):

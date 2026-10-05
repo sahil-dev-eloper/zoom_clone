@@ -14,8 +14,12 @@ from collections import defaultdict
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import select, text
 
-from .database import Base, SessionLocal, engine
+from .auth import hash_password
+from .database import Base, SessionLocal, engine, utcnow
+from .models import MeetingHistory, Participant, User
+from .routers import auth
 from .routers.meetings import router
 from .services import get_frontend_base, record_frontend_origin, seed_meetings
 
@@ -31,13 +35,49 @@ logging.basicConfig(level=logging.INFO)
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 
+def check_and_migrate_db():
+    """Add new columns to existing SQLite tables if not present."""
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE meetings ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE SET NULL"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE participants ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE SET NULL"))
+            conn.commit()
+        except Exception:
+            pass
+        try:
+            conn.execute(text("ALTER TABLE meetings ADD COLUMN is_seed BOOLEAN DEFAULT 0"))
+            conn.commit()
+        except Exception:
+            pass
+
+
+def seed_demo_user(db):
+    """Seed default demo user for frictionless login if table is empty."""
+    existing = db.scalar(select(User).limit(1))
+    if not existing:
+        demo = User(
+            email="sahil@example.com",
+            password_hash=hash_password("sahil123"),
+            display_name="Sahil Dargar",
+            created_at=utcnow(),
+        )
+        db.add(demo)
+        db.commit()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Create tables and seed demo data on first run."""
+    """Create tables, run migrations, and seed demo data on first run."""
     Base.metadata.create_all(bind=engine)
+    check_and_migrate_db()
     db = SessionLocal()
     try:
         seed_meetings(db, FRONTEND_URL)
+        seed_demo_user(db)
     finally:
         db.close()
     yield
@@ -73,6 +113,7 @@ async def track_frontend_origin_middleware(request: Request, call_next):
     return await call_next(request)
 
 
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(router)
 
 
@@ -204,7 +245,7 @@ async def signaling(websocket: WebSocket, meeting_id: str):
                         except Exception as e:
                             logger.warning(f"[Signaling] Failed to send peer-joined to {pid}: {e}")
 
-            elif msg_type in ("offer", "answer", "candidate", "media-state", "speaking"):
+            elif msg_type in ("offer", "answer", "candidate", "media-state", "speaking", "mute-peer", "mute-all"):
                 target = message.get("targetPeerId")
                 if target and target in _rooms[meeting_id]:
                     try:
@@ -229,14 +270,7 @@ async def signaling(websocket: WebSocket, meeting_id: str):
 
             elif msg_type == "leave" and peer_id:
                 logger.info(f"[Signaling] Peer {peer_id} sent leave for room {meeting_id}")
-                _rooms[meeting_id].pop(peer_id, None)
-                for pid, ws in _rooms[meeting_id].items():
-                    try:
-                        await ws.send_json(
-                            {"type": "peer-left", "peerId": peer_id}
-                        )
-                    except Exception as e:
-                        logger.warning(f"[Signaling] Error notifying peer-left to {pid}: {e}")
+                break
 
     except WebSocketDisconnect:
         logger.info(f"[Signaling] WebSocket disconnected for peer {peer_id} in room {meeting_id}")
@@ -244,14 +278,44 @@ async def signaling(websocket: WebSocket, meeting_id: str):
         logger.warning(f"[Signaling] Unexpected error in room {meeting_id} for peer {peer_id}: {exc}")
     finally:
         # Clean up on disconnect
-        if peer_id and meeting_id in _rooms:
-            _rooms[meeting_id].pop(peer_id, None)
-            for pid, ws in list(_rooms[meeting_id].items()):
-                try:
-                    await ws.send_json(
-                        {"type": "peer-left", "peerId": peer_id}
+        if peer_id:
+            # Mark participant as left in database so REST polling updates immediately
+            try:
+                from .database import SessionLocal, utcnow
+                from .models import MeetingHistory, Participant
+                with SessionLocal() as db:
+                    part = db.scalar(
+                        select(Participant).where(
+                            Participant.session_id == peer_id,
+                            Participant.left_at.is_(None),
+                        )
                     )
-                except Exception as e:
-                    logger.warning(f"[Signaling] Error sending peer-left to {pid}: {e}")
-            if not _rooms[meeting_id]:
-                del _rooms[meeting_id]
+                    if part:
+                        part.left_at = utcnow()
+                        db.add(
+                            MeetingHistory(
+                                meeting_id=part.meeting_id,
+                                action=f"left:{part.display_name}",
+                                timestamp=utcnow(),
+                            )
+                        )
+                        db.commit()
+                        logger.info(
+                            f"[Signaling] Marked participant {part.display_name} ({peer_id}) as left in DB on disconnect"
+                        )
+            except Exception as db_err:
+                logger.warning(
+                    f"[Signaling] Could not mark peer {peer_id} as left in DB: {db_err}"
+                )
+
+            if meeting_id in _rooms:
+                _rooms[meeting_id].pop(peer_id, None)
+                for pid, ws in list(_rooms[meeting_id].items()):
+                    try:
+                        await ws.send_json(
+                            {"type": "peer-left", "peerId": peer_id}
+                        )
+                    except Exception as e:
+                        logger.warning(f"[Signaling] Error sending peer-left to {pid}: {e}")
+                if not _rooms[meeting_id]:
+                    del _rooms[meeting_id]

@@ -1296,3 +1296,3968 @@ img, video { display: block; max-width: 100%; }
 }
 
 .invite-input-row button:hover { background: var(--blue-hover); }
+
+/* ======================================================================
+   ZOOM WORKPLACE APPLICATION SHELL & COMPONENTS
+   Accurate high-fidelity styles matching Zoom Workplace Reference Screenshots
+   ====================================================================== */
+
+:root {
+  --zoom-blue: #0E72ED;
+  --zoom-blue-dark: #0B5CFF;
+  --zoom-blue-light: #EDF5FF;
+  --zoom-blue-border: #CBE2FE;
+  --zoom-orange: #F26D21;
+  --zoom-orange-hover: #E05C12;
+  --zoom-text-dark: #111827;
+  --zoom-text-subtle: #475569;
+  --zoom-text-muted: #64748B;
+  --zoom-border: #E2E8F0;
+  --zoom-border-light: #EAEDF1;
+  --zoom-bg-gray: #F8FAFC;
+  --zoom-rail-bg: #FFFFFF;
+}
+
+/* App Container */
+.zoom-workplace-app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background: #FFFFFF;
+  color: var(--zoom-text-dark);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* ----------------------------------------------------------------------
+   1. Zoom Topbar
+   ---------------------------------------------------------------------- */
+.zoom-topbar {
+  height: 52px;
+  background: #FFFFFF;
+  border-bottom: 1px solid var(--zoom-border-light);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  flex-shrink: 0;
+  z-index: 50;
+  user-select: none;
+}
+
+.zoom-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.zoom-brand-group {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+.zoom-brand-word {
+  color: var(--zoom-blue-dark);
+  font-size: 23px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  font-family: inherit;
+}
+
+.zoom-brand-sub {
+  color: var(--zoom-text-dark);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.zoom-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  font-size: 13.5px;
+  color: var(--zoom-text-subtle);
+  font-weight: 500;
+}
+
+.zoom-dropdown-trigger {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.zoom-dropdown-trigger:hover {
+  color: var(--zoom-text-dark);
+  background: var(--zoom-bg-gray);
+}
+
+.zoom-nav-link {
+  color: var(--zoom-text-subtle);
+  transition: color 0.15s ease;
+  font-size: 13.5px;
+}
+
+.zoom-nav-link:hover {
+  color: var(--zoom-text-dark);
+}
+
+.zoom-history-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 6px;
+  color: #94A3B8;
+}
+
+.zoom-icon-btn {
+  background: transparent;
+  border: none;
+  color: #64748B;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.zoom-icon-btn:hover {
+  background: #F1F5F9;
+  color: var(--zoom-text-dark);
+}
+
+.zoom-icon-btn.subtle {
+  color: #94A3B8;
+}
+
+.zoom-topbar-center {
+  flex: 1;
+  max-width: 440px;
+  margin: 0 16px;
+}
+
+.zoom-search-bar {
+  width: 100%;
+  height: 32px;
+  background: #F1F3F6;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #64748B;
+  text-align: left;
+}
+
+.zoom-search-bar:hover {
+  background: #EAEFF5;
+  border-color: #CBD5E1;
+}
+
+.zoom-search-icon {
+  color: #94A3B8;
+}
+
+.zoom-search-placeholder {
+  font-size: 12.5px;
+  font-weight: 400;
+  color: #64748B;
+}
+
+.zoom-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.zoom-nav-link.admin-link {
+  font-size: 13px;
+  color: #475569;
+}
+
+.zoom-download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #E8F2FF;
+  color: var(--zoom-blue-dark);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 5px 14px;
+  border-radius: 16px;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.zoom-download-btn:hover {
+  background: #D9E9FF;
+  border-color: #BFDBFE;
+}
+
+.zoom-upgrade-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #0E71EB;
+  color: #FFFFFF;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 5px 14px;
+  border-radius: 16px;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.zoom-upgrade-btn:hover {
+  background: #004ECC;
+}
+
+.zoom-signin-header-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #0B5CFF;
+  color: #FFFFFF;
+  border: none;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 5px 14px;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.zoom-signin-header-btn:hover {
+  background: #004ECC;
+  transform: translateY(-1px);
+}
+
+.zoom-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  display: grid;
+  place-items: center;
+  z-index: 9999;
+  padding: 16px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.zoom-popover-anchor {
+  position: relative;
+}
+
+.zoom-icon-btn.notif-btn {
+  position: relative;
+}
+
+.zoom-badge-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 7px;
+  height: 7px;
+  background: #EF4444;
+  border-radius: 50%;
+  border: 1.5px solid #FFFFFF;
+}
+
+.zoom-avatar-button {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+.zoom-avatar {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1E3A8A, #0F172A);
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid #E2E8F0;
+}
+
+.zoom-avatar.large {
+  width: 48px;
+  height: 48px;
+  font-size: 16px;
+}
+
+.zoom-presence-dot {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid #FFFFFF;
+  background: #10B981;
+}
+
+.zoom-presence-dot.available { background: #10B981; }
+.zoom-presence-dot.busy { background: #EF4444; }
+.zoom-presence-dot.away { background: #F59E0B; }
+
+/* Dropdown Menus */
+.zoom-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: #FFFFFF;
+  border: 1px solid var(--zoom-border);
+  border-radius: 10px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
+  min-width: 240px;
+  z-index: 100;
+  padding: 6px;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.zoom-dropdown-header {
+  font-size: 11px;
+  font-weight: 700;
+  color: #94A3B8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 8px 10px 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.zoom-mark-read {
+  text-transform: none;
+  font-weight: 500;
+  color: var(--zoom-blue);
+  cursor: pointer;
+}
+
+.zoom-dropdown-item {
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.zoom-dropdown-item:hover, .zoom-dropdown-item.active {
+  background: #F1F5F9;
+}
+
+.zoom-dropdown-item strong {
+  display: block;
+  font-size: 13px;
+  color: var(--zoom-text-dark);
+}
+
+.zoom-dropdown-item span {
+  display: block;
+  font-size: 11px;
+  color: var(--zoom-text-muted);
+}
+
+.zoom-notif-item {
+  display: flex;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+}
+
+.zoom-notif-item.unread {
+  background: #F8FAFC;
+}
+
+.notif-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--zoom-blue);
+  margin-top: 5px;
+  flex-shrink: 0;
+}
+
+.notif-dot.read {
+  background: #CBD5E1;
+}
+
+.notif-text p {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--zoom-text-dark);
+  margin: 0;
+}
+
+.notif-text small {
+  font-size: 11px;
+  color: var(--zoom-text-muted);
+}
+
+.zoom-profile-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-bottom: 1px solid #F1F5F9;
+  margin-bottom: 8px;
+}
+
+.zoom-profile-info h4 {
+  font-size: 14px;
+  margin: 0;
+  color: var(--zoom-text-dark);
+}
+
+.zoom-profile-info p {
+  font-size: 12px;
+  color: var(--zoom-text-muted);
+  margin: 1px 0 4px;
+}
+
+.zoom-license-tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  background: #EFF6FF;
+  color: var(--zoom-blue);
+  padding: 1px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.zoom-status-selector {
+  padding: 4px 10px 8px;
+}
+
+.status-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #94A3B8;
+  margin-bottom: 4px;
+}
+
+.status-options {
+  display: flex;
+  gap: 4px;
+}
+
+.status-chip {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  padding: 4px 6px;
+  border-radius: 6px;
+  color: #475569;
+  cursor: pointer;
+}
+
+.status-chip.active {
+  background: #FFFFFF;
+  border-color: #94A3B8;
+  font-weight: 600;
+  color: var(--zoom-text-dark);
+}
+
+.presence-dot-mini {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.presence-dot-mini.available { background: #10B981; }
+.presence-dot-mini.busy { background: #EF4444; }
+.presence-dot-mini.away { background: #F59E0B; }
+
+.zoom-name-edit-form {
+  padding: 8px 10px;
+  background: #F8FAFC;
+  border-radius: 8px;
+  margin: 6px 0;
+  border: 1px solid #E2E8F0;
+}
+
+.zoom-edit-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748B;
+  margin-bottom: 5px;
+}
+
+.zoom-edit-input {
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #CBD5E1;
+  font-size: 13px;
+  color: #1E293B;
+  outline: none;
+  background: #FFFFFF;
+  box-sizing: border-box;
+}
+
+.zoom-edit-input:focus {
+  border-color: #0B5CFF;
+  box-shadow: 0 0 0 2px rgba(11, 92, 255, 0.15);
+}
+
+.zoom-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.zoom-btn-save {
+  background: #0B5CFF;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 5px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.zoom-btn-save:hover {
+  background: #004FE0;
+}
+
+.zoom-btn-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.zoom-btn-cancel {
+  background: transparent;
+  color: #64748B;
+  border: 1px solid #CBD5E1;
+  border-radius: 5px;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.zoom-btn-cancel:hover {
+  background: #F1F5F9;
+  color: #1E293B;
+}
+
+.zoom-menu-divider {
+  height: 1px;
+  background: #F1F5F9;
+  margin: 4px 0;
+}
+
+.zoom-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--zoom-text-dark);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.zoom-menu-row:hover {
+  background: #F1F5F9;
+}
+
+.zoom-menu-row.danger {
+  color: #EF4444;
+}
+
+.zoom-menu-row.danger:hover {
+  background: #FEF2F2;
+}
+
+/* ----------------------------------------------------------------------
+   2. Main Workspace Layout & Navigation Rail
+   ---------------------------------------------------------------------- */
+.zoom-workplace-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.zoom-nav-rail {
+  width: 68px;
+  background: #FFFFFF;
+  border-right: 1px solid var(--zoom-border-light);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 10px 0 16px;
+  flex-shrink: 0;
+  user-select: none;
+  z-index: 40;
+}
+
+.zoom-nav-rail-top, .zoom-nav-rail-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.zoom-rail-item {
+  width: 58px;
+  height: 54px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  cursor: pointer;
+  color: #64748B;
+  transition: all 0.15s ease;
+}
+
+.zoom-rail-item:hover {
+  background: #F1F5F9;
+  color: var(--zoom-text-dark);
+}
+
+.zoom-rail-item.active {
+  background: #E8F1FC;
+  color: var(--zoom-blue-dark);
+  font-weight: 600;
+}
+
+.zoom-rail-icon-box {
+  display: grid;
+  place-items: center;
+}
+
+.zoom-rail-label {
+  font-size: 11px;
+  letter-spacing: -0.01em;
+}
+
+.zoom-workplace-main {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  background: #FFFFFF;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ----------------------------------------------------------------------
+   3. Home View (Screenshot 1)
+   ---------------------------------------------------------------------- */
+.zoom-home-container {
+  max-width: 820px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 36px 20px 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: fadeIn 0.25s ease-out;
+}
+
+/* Clock Section */
+.zoom-clock-section {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.zoom-clock-time {
+  font-size: 46px;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  color: #111827;
+  line-height: 1.1;
+  font-feature-settings: "tnum";
+}
+
+.zoom-clock-date {
+  font-size: 15px;
+  font-weight: 500;
+  color: #64748B;
+  margin-top: 4px;
+}
+
+/* Hero Action Squircles */
+.zoom-hero-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 36px;
+  margin-bottom: 28px;
+}
+
+.zoom-action-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.zoom-squircle-btn {
+  width: 62px;
+  height: 62px;
+  border-radius: 20px;
+  border: none;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.zoom-squircle-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.05);
+}
+
+.zoom-squircle-btn:active {
+  transform: translateY(0);
+}
+
+.zoom-squircle-btn.orange {
+  background: var(--zoom-orange);
+  box-shadow: 0 4px 14px rgba(242, 109, 33, 0.3);
+}
+
+.zoom-squircle-btn.blue {
+  background: var(--zoom-blue);
+  box-shadow: 0 4px 14px rgba(14, 114, 237, 0.3);
+}
+
+.zoom-cal-icon-inner {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.zoom-cal-day-num {
+  position: absolute;
+  top: 9px;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--zoom-blue);
+}
+
+.zoom-action-label-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--zoom-text-dark);
+  cursor: pointer;
+}
+
+.zoom-action-label-row:hover {
+  color: var(--zoom-blue);
+}
+
+.zoom-caret-icon {
+  color: #64748B;
+}
+
+.new-meeting-menu {
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 270px;
+}
+
+.zoom-menu-check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.zoom-menu-check-item:hover {
+  background: #F1F5F9;
+}
+
+.zoom-menu-check-item input[type="checkbox"] {
+  margin-top: 3px;
+}
+
+/* Quick Action Pills */
+.zoom-quick-pills {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.zoom-pill-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #FFFFFF;
+  border: 1px solid var(--zoom-border);
+  border-radius: 24px;
+  padding: 8px 20px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--zoom-text-dark);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+.zoom-pill-btn:hover {
+  border-color: #94A3B8;
+  background: #F8FAFC;
+  transform: translateY(-1px);
+}
+
+.zoom-record-dot-icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #EF4444;
+  display: grid;
+  place-items: center;
+}
+
+.zoom-record-dot-icon .dot-inner {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #EF4444;
+}
+
+/* Calendar Notice Alert Card */
+.zoom-alert-card {
+  width: 100%;
+  max-width: 620px;
+  background: var(--zoom-blue-light);
+  border: 1px solid var(--zoom-blue-border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--zoom-text-dark);
+  margin-bottom: 16px;
+}
+
+.zoom-alert-card.connected {
+  background: #ECFDF5;
+  border-color: #A7F3D0;
+}
+
+.zoom-alert-icon {
+  flex-shrink: 0;
+}
+
+.zoom-alert-content {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.zoom-alert-link {
+  background: transparent;
+  border: none;
+  color: var(--zoom-blue-dark);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: none;
+}
+
+.zoom-alert-link:hover {
+  text-decoration: underline;
+}
+
+/* Calendar Container Card */
+.zoom-calendar-card {
+  width: 100%;
+  max-width: 620px;
+  background: #FFFFFF;
+  border: 1px solid var(--zoom-border);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.zoom-cal-tabs-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px 8px;
+  border-bottom: 1px solid #F1F5F9;
+  background: #FAFBFD;
+}
+
+.zoom-cal-toggle-group {
+  display: inline-flex;
+  background: #E2E8F0;
+  padding: 3px;
+  border-radius: 8px;
+  gap: 2px;
+}
+
+.zoom-cal-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  font-size: 12.5px;
+  font-weight: 500;
+  border: none;
+  background: transparent;
+  color: #64748B;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.zoom-cal-toggle-btn:hover {
+  color: #1E293B;
+}
+
+.zoom-cal-toggle-btn.active {
+  background: #FFFFFF;
+  color: #0B5CFF;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.zoom-recent-ended-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748B;
+  background: #F1F5F9;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.zoom-calendar-header {
+  padding: 12px 16px 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.zoom-calendar-title-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--zoom-text-dark);
+  cursor: pointer;
+}
+
+.zoom-calendar-caret {
+  color: #64748B;
+}
+
+.zoom-calendar-subbar {
+  padding: 6px 16px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.zoom-calendar-nav-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.zoom-today-pill {
+  background: #F1F5F9;
+  border: 1px solid #E2E8F0;
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--zoom-text-dark);
+  padding: 3px 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.zoom-today-pill:hover {
+  background: #E2E8F0;
+  color: #0B5CFF;
+}
+
+.zoom-today-pill.active {
+  background: #EFF6FF;
+  border-color: #BFDBFE;
+  color: #0B5CFF;
+  font-weight: 700;
+}
+
+.zoom-sub-arrow {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #64748B;
+  cursor: pointer;
+  padding: 3px 5px;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+  transition: all 0.15s ease;
+}
+
+.zoom-sub-arrow:hover {
+  background: #EFF6FF;
+  border-color: #BFDBFE;
+  color: #0B5CFF;
+  transform: scale(1.08);
+}
+
+.zoom-sub-arrow:active {
+  transform: scale(0.95);
+}
+
+.zoom-sub-more:hover {
+  background: #F1F5F9;
+  color: var(--zoom-text-dark);
+}
+
+.zoom-sub-more {
+  background: transparent;
+  border: none;
+  color: #94A3B8;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+}
+
+.zoom-calendar-body {
+  padding: 24px 20px 28px;
+}
+
+.zoom-empty-calendar-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 0;
+}
+
+.zoom-parasol-art {
+  animation: scaleIn 0.3s ease-out;
+}
+
+.zoom-empty-caption {
+  font-size: 13.5px;
+  color: #64748B;
+  margin: 0;
+}
+
+.zoom-scheduled-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.zoom-scheduled-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+}
+
+.zoom-scheduled-time-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--zoom-blue);
+  background: #EFF6FF;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.zoom-scheduled-info {
+  flex: 1;
+  margin: 0 16px;
+}
+
+.zoom-scheduled-info h4 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--zoom-text-dark);
+}
+
+.zoom-scheduled-info p {
+  font-size: 12px;
+  color: #64748B;
+  margin: 2px 0 0;
+}
+
+.zoom-scheduled-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ----------------------------------------------------------------------
+   4. Chat View (Screenshot 2)
+   ---------------------------------------------------------------------- */
+.zoom-chat-layout {
+  display: flex;
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+}
+
+.zoom-chat-sidebar {
+  width: 260px;
+  background: #FFFFFF;
+  border-right: 1px solid var(--zoom-border-light);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.zoom-chat-header {
+  height: 48px;
+  padding: 0 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.zoom-chat-title-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.zoom-chat-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--zoom-text-dark);
+}
+
+.zoom-chat-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.zoom-chat-icon-btn {
+  background: transparent;
+  border: none;
+  color: #64748B;
+  padding: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.zoom-chat-icon-btn:hover {
+  background: #F1F5F9;
+  color: var(--zoom-text-dark);
+}
+
+.zoom-chat-plus-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--zoom-blue);
+  border: none;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.zoom-chat-plus-btn:hover {
+  transform: scale(1.08);
+}
+
+.zoom-chat-filters {
+  display: flex;
+  gap: 6px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #F8FAFC;
+}
+
+.zoom-filter-pill {
+  background: transparent;
+  border: none;
+  font-size: 12px;
+  color: #64748B;
+  padding: 4px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.zoom-filter-pill:hover {
+  background: #F1F5F9;
+}
+
+.zoom-filter-pill.active {
+  background: #E2E8F0;
+  color: var(--zoom-text-dark);
+  font-weight: 700;
+}
+
+.zoom-chat-tree {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 10px;
+}
+
+.zoom-tree-section {
+  margin-bottom: 6px;
+}
+
+.zoom-tree-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #475569;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.zoom-tree-header:hover {
+  background: #F8FAFC;
+  color: var(--zoom-text-dark);
+}
+
+.zoom-tree-items {
+  padding-left: 14px;
+  margin-top: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.zoom-tree-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #64748B;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.zoom-tree-item:hover {
+  background: #F1F5F9;
+  color: var(--zoom-text-dark);
+}
+
+.zoom-tree-item.active {
+  background: #EFF6FF;
+  color: var(--zoom-blue);
+  font-weight: 600;
+}
+
+.tree-icon {
+  color: #94A3B8;
+}
+
+.tree-icon.ai {
+  color: #8B5CF6;
+}
+
+.zoom-tree-empty {
+  font-size: 12px;
+  color: #94A3B8;
+  padding: 4px 8px;
+}
+
+/* Chat Main Area */
+.zoom-chat-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #FFFFFF;
+}
+
+.zoom-chat-empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  text-align: center;
+}
+
+.zoom-chat-illustration {
+  margin-bottom: 24px;
+  animation: scaleIn 0.3s ease-out;
+}
+
+.zoom-chat-empty-caption {
+  font-size: 14px;
+  color: #64748B;
+  max-width: 320px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.zoom-chat-conversation {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.zoom-conv-header {
+  height: 52px;
+  padding: 0 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #EAEDF1;
+}
+
+.zoom-conv-title-box h3 {
+  font-size: 15px;
+  margin: 0;
+  color: var(--zoom-text-dark);
+}
+
+.zoom-conv-subtitle {
+  font-size: 11px;
+  color: #94A3B8;
+}
+
+.zoom-conv-feed {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.zoom-msg-bubble {
+  display: flex;
+  gap: 12px;
+  max-width: 80%;
+}
+
+.zoom-msg-bubble.self {
+  margin-left: auto;
+  flex-direction: row-reverse;
+}
+
+.zoom-msg-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #E2E8F0;
+  color: #334155;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.zoom-msg-bubble.self .zoom-msg-avatar {
+  background: #1E3A8A;
+  color: #FFFFFF;
+}
+
+.zoom-msg-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.zoom-msg-meta {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+
+.zoom-msg-meta strong {
+  font-size: 12.5px;
+  color: var(--zoom-text-dark);
+}
+
+.zoom-msg-time {
+  font-size: 11px;
+  color: #94A3B8;
+}
+
+.zoom-msg-text {
+  background: #F1F5F9;
+  padding: 9px 13px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--zoom-text-dark);
+}
+
+.zoom-msg-bubble.self .zoom-msg-text {
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+}
+
+.zoom-conv-input-area {
+  padding: 12px 20px 16px;
+  border-top: 1px solid #EAEDF1;
+}
+
+.zoom-conv-input-box {
+  background: #F8FAFC;
+  border: 1px solid #CBD5E1;
+  border-radius: 10px;
+  padding: 10px 12px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.zoom-conv-input-box input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 13.5px;
+  color: var(--zoom-text-dark);
+  font-family: inherit;
+}
+
+.zoom-conv-tools {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.zoom-tools-left {
+  display: flex;
+  gap: 6px;
+}
+
+.tool-btn {
+  background: transparent;
+  border: none;
+  color: #64748B;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.tool-btn:hover {
+  background: #E2E8F0;
+  color: var(--zoom-text-dark);
+}
+
+.zoom-send-btn {
+  background: var(--zoom-blue);
+  color: #FFFFFF;
+  border: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.zoom-send-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ----------------------------------------------------------------------
+   5. Meetings View (Screenshot 3)
+   ---------------------------------------------------------------------- */
+.zoom-meetings-layout {
+  display: flex;
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+}
+
+.zoom-meetings-sidebar {
+  width: 280px;
+  background: #FFFFFF;
+  border-right: 1px solid var(--zoom-border-light);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.zoom-meetings-header {
+  height: 48px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.zoom-refresh-btn {
+  background: transparent;
+  border: none;
+  color: #64748B;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.zoom-refresh-btn:hover {
+  background: #F1F5F9;
+  color: var(--zoom-text-dark);
+}
+
+.zoom-meetings-header-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--zoom-text-dark);
+}
+
+.zoom-meetings-tab-toggle {
+  display: flex;
+  background: #F1F5F9;
+  border-radius: 8px;
+  padding: 3px;
+  margin: 10px 14px 4px;
+  gap: 3px;
+}
+
+.zoom-meetings-tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  color: #64748B;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.zoom-meetings-tab-btn:hover {
+  color: #1E293B;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.zoom-meetings-tab-btn.active {
+  background: #FFFFFF;
+  color: #0B5CFF;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Live / In Progress indicator */
+.zoom-recent-active-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #15803D;
+  background: #DCFCE7;
+  padding: 2px 7px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.zoom-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #16A34A;
+  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2);
+  animation: pulseDot 1.8s infinite;
+}
+
+@keyframes pulseDot {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 0.6;
+  }
+}
+
+.zoom-recent-active-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 24px;
+}
+
+.zoom-recent-active-banner strong {
+  font-size: 14px;
+  color: #166534;
+  display: block;
+  margin-bottom: 3px;
+}
+
+.zoom-recent-active-banner p {
+  font-size: 12.5px;
+  color: #15803D;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.zoom-live-dot-lg {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #16A34A;
+  margin-top: 4px;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.25);
+  animation: pulseDot 1.8s infinite;
+  flex-shrink: 0;
+}
+
+/* Meeting History Record Card */
+.zoom-meeting-history-card {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.zoom-history-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  border-bottom: 1px solid #F1F5F9;
+  padding-bottom: 10px;
+}
+
+.zoom-history-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.zoom-history-label {
+  color: #64748B;
+  font-weight: 500;
+}
+
+.zoom-history-val {
+  color: #1E293B;
+  font-weight: 600;
+}
+
+.zoom-history-notice {
+  font-size: 12.5px;
+  color: #94A3B8;
+  line-height: 1.5;
+  margin: 0;
+  padding: 12px 14px;
+  background: #F8FAFC;
+  border-left: 3px solid #CBD5E1;
+  border-radius: 4px;
+}
+
+.zoom-meetings-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Solid Blue PMI Card (Exact match to Screenshot 3) */
+.zoom-pmi-card {
+  background: #0B5CFF;
+  color: #FFFFFF;
+  border-radius: 10px;
+  padding: 16px 18px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(11, 92, 255, 0.25);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.zoom-pmi-card:hover {
+  filter: brightness(1.04);
+}
+
+.zoom-pmi-card-number {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: 3px;
+}
+
+.zoom-pmi-card-sub {
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.zoom-meetings-empty {
+  text-align: center;
+  padding: 36px 0;
+  color: #94A3B8;
+  font-size: 13px;
+}
+
+.zoom-upcoming-sublist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.zoom-upcoming-item {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #E2E8F0;
+  background: #FFFFFF;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.zoom-upcoming-item:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+.zoom-upcoming-item.active {
+  border-color: #0B5CFF;
+  background: #EFF6FF;
+}
+
+.item-time {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--zoom-blue);
+  margin-bottom: 2px;
+}
+
+.item-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--zoom-text-dark);
+}
+
+.item-sub {
+  font-size: 11px;
+  color: #94A3B8;
+}
+
+.zoom-add-calendar-box {
+  padding: 12px 16px;
+  border-top: 1px solid #F1F5F9;
+}
+
+.zoom-add-calendar-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: none;
+  color: var(--zoom-blue);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.zoom-add-calendar-link:hover {
+  text-decoration: underline;
+}
+
+/* Meeting Detail Pane (Screenshot 3) */
+.zoom-meetings-main {
+  flex: 1;
+  padding: 40px 48px;
+  overflow-y: auto;
+  background: #FFFFFF;
+}
+
+.zoom-meeting-details {
+  max-width: 640px;
+}
+
+.zoom-detail-title {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: #111827;
+  margin: 0 0 8px;
+}
+
+.zoom-detail-id {
+  font-size: 14px;
+  color: #475569;
+  margin-bottom: 24px;
+}
+
+.zoom-meeting-meta-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #EFF6FF;
+  color: var(--zoom-blue);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 24px;
+}
+
+.zoom-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+/* Button utility classes */
+.zoom-btn-primary {
+  background: #0B5CFF;
+  color: #FFFFFF;
+  border: none;
+  font-weight: 600;
+  font-size: 13.5px;
+  padding: 8px 24px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.zoom-btn-primary:hover {
+  background: #004FE3;
+  transform: translateY(-1px);
+}
+
+.zoom-btn-primary.pill {
+  border-radius: 20px;
+  padding: 8px 26px;
+}
+
+.zoom-btn-primary.sm {
+  padding: 5px 14px;
+  font-size: 12px;
+}
+
+.zoom-btn-outline {
+  background: #FFFFFF;
+  color: var(--zoom-text-dark);
+  border: 1px solid #CBD5E1;
+  font-weight: 500;
+  font-size: 13.5px;
+  padding: 8px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.zoom-btn-outline:hover {
+  border-color: #94A3B8;
+  background: #F8FAFC;
+}
+
+.zoom-btn-outline.pill {
+  border-radius: 20px;
+  padding: 8px 22px;
+}
+
+.zoom-btn-outline.sm {
+  padding: 5px 12px;
+  font-size: 12px;
+}
+
+.zoom-invitation-toggle-wrap {
+  margin-top: 16px;
+}
+
+.zoom-invitation-toggle-btn {
+  background: transparent;
+  border: none;
+  color: var(--zoom-blue);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+}
+
+.zoom-invitation-toggle-btn:hover {
+  text-decoration: underline;
+}
+
+.zoom-invitation-preview-card {
+  margin-top: 16px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 20px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.zoom-invite-text {
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #334155;
+}
+
+.invite-link-url {
+  color: var(--zoom-blue);
+  word-break: break-all;
+}
+
+.zoom-invite-copy-footer {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #E2E8F0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ----------------------------------------------------------------------
+   6. Settings Modal (Screenshot 4)
+   ---------------------------------------------------------------------- */
+.zoom-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  display: grid;
+  place-items: center;
+  z-index: 1000;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.zoom-settings-modal {
+  width: 740px;
+  height: 520px;
+  background: #FFFFFF;
+  border-radius: 14px;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: scaleIn 0.2s ease-out;
+}
+
+.zoom-settings-header {
+  height: 48px;
+  padding: 0 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #EAEDF1;
+}
+
+.zoom-settings-header h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--zoom-text-dark);
+  margin: 0;
+}
+
+.zoom-settings-close {
+  background: transparent;
+  border: none;
+  color: #64748B;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.zoom-settings-close:hover {
+  background: #F1F5F9;
+  color: var(--zoom-text-dark);
+}
+
+.zoom-settings-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.zoom-settings-tabs {
+  width: 170px;
+  background: #FFFFFF;
+  border-right: 1px solid #EAEDF1;
+  padding: 16px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.zoom-settings-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 14px;
+  border-radius: 20px;
+  border: none;
+  background: transparent;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.zoom-settings-tab-btn:hover {
+  background: #F1F5F9;
+  color: var(--zoom-text-dark);
+}
+
+/* Active tab button: Solid blue pill matching Screenshot 4! */
+.zoom-settings-tab-btn.active {
+  background: #0B5CFF;
+  color: #FFFFFF;
+  font-weight: 600;
+}
+
+.zoom-settings-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 32px;
+}
+
+.zoom-settings-pane {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.zoom-settings-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.zoom-settings-row-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.zoom-sec-title {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--zoom-text-dark);
+  margin: 0 0 3px;
+}
+
+.zoom-sec-sub {
+  font-size: 12.5px;
+  color: #64748B;
+  margin: 0;
+}
+
+.zoom-link-btn {
+  background: transparent;
+  border: none;
+  color: var(--zoom-blue);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.zoom-link-btn:hover {
+  text-decoration: underline;
+}
+
+.zoom-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--zoom-text-dark);
+  cursor: pointer;
+}
+
+.zoom-checkbox-label input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  accent-color: var(--zoom-blue);
+}
+
+.zoom-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--zoom-text-dark);
+  cursor: pointer;
+}
+
+.zoom-radio-label input[type="radio"] {
+  accent-color: var(--zoom-blue);
+}
+
+.zoom-theme-options {
+  display: flex;
+  gap: 20px;
+  margin-top: 8px;
+}
+
+.zoom-device-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.zoom-select {
+  flex: 1;
+  height: 36px;
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 6px;
+  padding: 0 10px;
+  font-size: 13px;
+  color: var(--zoom-text-dark);
+  outline: none;
+}
+
+.zoom-select:focus {
+  border-color: #0B5CFF;
+}
+
+.zoom-meter-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.meter-label {
+  font-size: 12px;
+  color: #64748B;
+  width: 70px;
+}
+
+.zoom-volume-meter {
+  flex: 1;
+  height: 8px;
+  background: #E2E8F0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.zoom-volume-fill {
+  height: 100%;
+  background: #10B981;
+  border-radius: 4px;
+  transition: width 0.1s linear;
+}
+
+.zoom-video-preview-box {
+  width: 100%;
+  height: 180px;
+  background: #0F172A;
+  border-radius: 8px;
+  margin-top: 12px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.zoom-video-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.zoom-video-preview.mirror {
+  transform: scaleX(-1);
+}
+
+.zoom-video-preview-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: #94A3B8;
+  font-size: 13px;
+}
+
+.zoom-account-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #EAEDF1;
+}
+
+.zoom-account-details h3 {
+  font-size: 16px;
+  margin: 0;
+  color: var(--zoom-text-dark);
+}
+
+.account-email {
+  font-size: 13px;
+  color: #64748B;
+  margin: 2px 0 6px;
+}
+
+.account-badge {
+  font-size: 11px;
+  font-weight: 700;
+  background: #EFF6FF;
+  color: var(--zoom-blue);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+/* ----------------------------------------------------------------------
+   7. Contacts View
+   ---------------------------------------------------------------------- */
+.zoom-contacts-layout {
+  display: flex;
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+}
+
+.zoom-contacts-sidebar {
+  width: 260px;
+  background: #FFFFFF;
+  border-right: 1px solid var(--zoom-border-light);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.zoom-contacts-header {
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.zoom-contacts-search-box {
+  flex: 1;
+  height: 32px;
+  background: #F1F3F6;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+}
+
+.zoom-contacts-search-box input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 12px;
+  width: 100%;
+  color: var(--zoom-text-dark);
+}
+
+.zoom-icon-btn.plus {
+  background: #EFF6FF;
+  color: var(--zoom-blue);
+}
+
+.zoom-contacts-categories {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.category-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  color: #475569;
+  cursor: pointer;
+  text-align: left;
+}
+
+.category-item:hover {
+  background: #F8FAFC;
+  color: var(--zoom-text-dark);
+}
+
+.category-item.active {
+  background: #EFF6FF;
+  color: var(--zoom-blue);
+  font-weight: 600;
+}
+
+.count-badge {
+  margin-left: auto;
+  font-size: 11px;
+  background: #F1F5F9;
+  color: #64748B;
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+.zoom-contacts-main {
+  flex: 1;
+  padding: 24px 32px;
+  overflow-y: auto;
+}
+
+.zoom-contacts-title-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 20px;
+}
+
+.zoom-contacts-title-bar h2 {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--zoom-text-dark);
+}
+
+.contacts-count {
+  font-size: 12.5px;
+  color: #94A3B8;
+}
+
+.zoom-contacts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.zoom-contact-card {
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  background: #FFFFFF;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.contact-avatar-wrap {
+  position: relative;
+  margin-bottom: 10px;
+}
+
+.contact-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #E0E7FF;
+  color: #4338CA;
+  font-size: 18px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+
+.contact-status-dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #FFFFFF;
+}
+
+.contact-status-dot.available { background: #10B981; }
+.contact-status-dot.busy { background: #EF4444; }
+.contact-status-dot.away { background: #F59E0B; }
+.contact-status-dot.offline { background: #94A3B8; }
+
+.contact-details h4 {
+  font-size: 14.5px;
+  margin: 0;
+  color: var(--zoom-text-dark);
+}
+
+.contact-email {
+  font-size: 12px;
+  color: #64748B;
+  margin: 2px 0 6px;
+}
+
+.contact-dept {
+  display: inline-block;
+  font-size: 11px;
+  background: #F1F5F9;
+  color: #475569;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.contact-card-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  margin-top: 14px;
+}
+
+.contact-act-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.contact-act-btn.meet {
+  background: #0B5CFF;
+  color: #FFFFFF;
+}
+
+.contact-act-btn.meet:hover {
+  background: #004FE3;
+}
+
+.contact-act-btn.chat {
+  background: #F1F5F9;
+  color: var(--zoom-text-dark);
+  border-color: #CBD5E1;
+}
+
+.contact-act-btn.chat:hover {
+  background: #E2E8F0;
+}
+
+/* ----------------------------------------------------------------------
+   8. Standard Modals & Dialogs (Join, Schedule, Quick Modals)
+   ---------------------------------------------------------------------- */
+.zoom-dialog-modal {
+  width: 440px;
+  background: #FFFFFF;
+  border-radius: 12px;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: scaleIn 0.2s ease-out;
+}
+
+.zoom-dialog-modal.wide {
+  width: 540px;
+}
+
+.zoom-dialog-head {
+  height: 48px;
+  padding: 0 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #EAEDF1;
+}
+
+.zoom-dialog-head h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--zoom-text-dark);
+}
+
+.zoom-dialog-close {
+  background: transparent;
+  border: none;
+  color: #64748B;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.zoom-dialog-body {
+  padding: 20px;
+}
+
+.zoom-dialog-body.scrollable {
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+.zoom-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.zoom-form-field label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--zoom-text-dark);
+}
+
+.zoom-form-row {
+  display: flex;
+  gap: 12px;
+}
+
+.zoom-input {
+  height: 38px;
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 6px;
+  padding: 0 12px;
+  font-size: 13px;
+  color: var(--zoom-text-dark);
+  outline: none;
+  transition: border-color 0.15s ease;
+  font-family: inherit;
+}
+
+.zoom-input:focus {
+  border-color: #0B5CFF;
+  box-shadow: 0 0 0 2px rgba(11, 92, 255, 0.15);
+}
+
+.zoom-input.mini {
+  height: 30px;
+  width: 100px;
+  font-size: 12px;
+  padding: 0 8px;
+}
+
+.zoom-textarea {
+  min-height: 80px;
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--zoom-text-dark);
+  outline: none;
+  transition: border-color 0.15s ease;
+  font-family: inherit;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.zoom-textarea:focus {
+  border-color: #0B5CFF;
+  box-shadow: 0 0 0 2px rgba(11, 92, 255, 0.15);
+}
+
+.zoom-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.zoom-security-box {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.security-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.zoom-video-settings-row {
+  display: flex;
+  gap: 32px;
+}
+
+.video-setting-col {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.col-label {
+  font-size: 13px;
+  color: #64748B;
+  width: 80px;
+}
+
+.zoom-dialog-footer {
+  padding: 12px 20px;
+  border-top: 1px solid #EAEDF1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  background: #F8FAFC;
+}
+
+.zoom-form-error {
+  color: #EF4444;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+/* Quick Modals: Recordings, Summaries, Notes, Search */
+.zoom-standard-modal {
+  width: 560px;
+  background: #FFFFFF;
+  border-radius: 12px;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: scaleIn 0.2s ease-out;
+}
+
+.zoom-std-header {
+  height: 48px;
+  padding: 0 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #EAEDF1;
+}
+
+.zoom-std-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.zoom-std-title-group h3 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.zoom-std-close {
+  background: transparent;
+  border: none;
+  color: #64748B;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.zoom-std-body {
+  padding: 20px;
+  max-height: 480px;
+  overflow-y: auto;
+}
+
+.zoom-recordings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.zoom-rec-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+}
+
+.rec-info h4 {
+  font-size: 13.5px;
+  font-weight: 600;
+  margin: 0 0 4px;
+  color: var(--zoom-text-dark);
+}
+
+.rec-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11.5px;
+  color: #64748B;
+}
+
+.rec-badge {
+  background: #EFF6FF;
+  color: var(--zoom-blue);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.rec-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.zoom-summary-card {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.summary-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: 1px solid #E2E8F0;
+  padding-bottom: 10px;
+  margin-bottom: 14px;
+}
+
+.summary-card-header h4 {
+  font-size: 14px;
+  margin: 0;
+  color: var(--zoom-text-dark);
+}
+
+.summary-date {
+  font-size: 11px;
+  color: #94A3B8;
+}
+
+.summary-section {
+  margin-bottom: 14px;
+}
+
+.summary-section h5 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748B;
+  margin: 0 0 6px;
+}
+
+.summary-section p {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #334155;
+  margin: 0;
+}
+
+.summary-checklist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.summary-checklist li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  color: #334155;
+}
+
+.zoom-notes-sub {
+  font-size: 12px;
+  color: #64748B;
+  margin: 0 0 10px;
+}
+
+.zoom-notes-textarea {
+  width: 100%;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 13px;
+  font-family: inherit;
+  line-height: 1.5;
+  color: var(--zoom-text-dark);
+  outline: none;
+  resize: vertical;
+}
+
+.zoom-notes-textarea:focus {
+  border-color: #0B5CFF;
+}
+
+/* Search Modal (Ctrl+K) */
+.zoom-search-modal {
+  width: 520px;
+  background: #FFFFFF;
+  border-radius: 12px;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: scaleIn 0.2s ease-out;
+}
+
+.zoom-search-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid #EAEDF1;
+}
+
+.zoom-search-input-wrap .search-icon {
+  color: #94A3B8;
+}
+
+.zoom-search-input-wrap input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 14px;
+  color: var(--zoom-text-dark);
+  font-family: inherit;
+}
+
+.esc-badge {
+  font-size: 10px;
+  background: #F1F5F9;
+  border: 1px solid #CBD5E1;
+  color: #64748B;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.zoom-search-results {
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.zoom-search-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.zoom-search-item:hover {
+  background: #F1F5F9;
+}
+
+.item-icon-box {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  display: grid;
+  place-items: center;
+}
+
+.item-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.item-text strong {
+  font-size: 13px;
+  color: var(--zoom-text-dark);
+}
+
+.item-text span {
+  font-size: 11.5px;
+  color: #64748B;
+}
+
+.item-arrow {
+  color: #94A3B8;
+}
+
+.zoom-search-empty {
+  padding: 24px;
+  text-align: center;
+  color: #94A3B8;
+  font-size: 13px;
+}
+
+/* ======================================================================
+   ZOOM IN-MEETING INTERFACE (Matching Reference Image)
+   ====================================================================== */
+
+.zoom-meeting-app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background: #000000;
+  color: #FFFFFF;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.zoom-meeting-app-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.zoom-meeting-viewport,
+.zoom-inmeeting-app-shell {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #000000;
+  position: relative;
+  overflow: hidden;
+  height: 100%;
+  width: 100%;
+}
+
+/* In-meeting topbar */
+.zoom-inmeeting-topbar {
+  height: 40px;
+  background: #000000;
+  border-bottom: 1px solid #18181A;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  flex-shrink: 0;
+  z-index: 40;
+  user-select: none;
+}
+
+.zoom-inmeeting-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.zoom-info-badge-btn {
+  background: transparent;
+  border: none;
+  color: #22C55E;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  transition: background 0.15s ease;
+}
+
+.zoom-info-badge-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.zoom-inmeeting-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #F3F4F6;
+  letter-spacing: -0.01em;
+}
+
+.zoom-inmeeting-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.zoom-inmeeting-icon-btn {
+  background: transparent;
+  border: none;
+  color: #9CA3AF;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.zoom-inmeeting-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #FFFFFF;
+}
+
+.zoom-inmeeting-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #2563EB;
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.zoom-inmeeting-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* In-meeting stage */
+.zoom-inmeeting-stage {
+  flex: 1;
+  position: relative;
+  background: #000000;
+  display: flex;
+  overflow: hidden;
+}
+
+.zoom-stage-center {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000000;
+  overflow: hidden;
+}
+
+/* User avatar photo in center when camera is off */
+.zoom-center-avatar-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.zoom-center-avatar-card {
+  width: 140px;
+  height: 140px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #1E293B;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  display: grid;
+  place-items: center;
+  transition: transform 0.2s ease;
+}
+
+.zoom-center-avatar-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.zoom-center-avatar-initials {
+  font-size: 48px;
+  font-weight: 700;
+  color: #FFFFFF;
+}
+
+/* Live video element when camera is on */
+.zoom-live-video-element {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000000;
+  transform: scaleX(-1);
+  z-index: 5;
+}
+
+/* Participant floating name pill in bottom-left */
+.zoom-stage-name-pill {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 4px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #FFFFFF;
+  z-index: 25;
+  user-select: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.zoom-mic-slash-icon {
+  color: #EF4444;
+  display: grid;
+  place-items: center;
+}
+
+.zoom-mic-live-icon {
+  color: #22C55E;
+  display: grid;
+  place-items: center;
+}
+
+/* Multi-Participant Video Grid */
+.zoom-stage-grid {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+}
+
+.zoom-stage-grid.count-1 {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.zoom-stage-grid.count-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.zoom-stage-grid.count-3,
+.zoom-stage-grid.count-4 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+}
+
+.zoom-video-tile {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+  background: #111827;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid transparent;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.zoom-video-tile.speaking {
+  border-color: #22C55E;
+  box-shadow: 0 0 16px rgba(34, 197, 94, 0.4);
+}
+
+.zoom-tile-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000000;
+}
+
+.zoom-tile-video.self {
+  transform: scaleX(-1);
+}
+
+.zoom-tile-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.zoom-tile-avatar-card {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background: #1E293B;
+  display: grid;
+  place-items: center;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.zoom-tile-initials {
+  font-size: 32px;
+  font-weight: 700;
+  color: #FFFFFF;
+  text-transform: uppercase;
+}
+
+.zoom-tile-name-pill {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #FFFFFF;
+  z-index: 10;
+  user-select: none;
+}
+
+/* Floating Reactions */
+.zoom-floating-reaction {
+  position: absolute;
+  bottom: 80px;
+  font-size: 38px;
+  animation: zoomFloatUp 2.4s ease-out forwards;
+  pointer-events: none;
+  z-index: 50;
+}
+
+@keyframes zoomFloatUp {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.6);
+  }
+  15% {
+    opacity: 1;
+    transform: translateY(0) scale(1.15);
+  }
+  30% {
+    transform: translateY(-40px) scale(1);
+  }
+  80% {
+    opacity: 0.9;
+    transform: translateY(-160px) scale(0.95);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-240px) scale(0.8);
+  }
+}
+
+/* In-meeting bottom toolbar */
+.zoom-inmeeting-bottom-bar {
+  height: 68px;
+  background: #000000;
+  border-top: 1px solid #1A1A1A;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  flex-shrink: 0;
+  z-index: 40;
+  user-select: none;
+  position: relative;
+  width: 100%;
+}
+
+.zoom-bottom-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.zoom-bottom-group.center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  gap: 6px;
+}
+
+.zoom-dock-btn {
+  background: transparent;
+  border: none;
+  color: #FFFFFF;
+  min-width: 58px;
+  height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 4px 6px;
+  transition: background 0.15s ease;
+  position: relative;
+}
+
+.zoom-dock-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.zoom-dock-btn.active {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.zoom-dock-icon-box {
+  height: 24px;
+  display: grid;
+  place-items: center;
+  position: relative;
+}
+
+.zoom-dock-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: #D1D5DB;
+  margin-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  line-height: 1;
+}
+
+.zoom-caret-mini {
+  font-size: 10px;
+  color: #9CA3AF;
+  margin-left: 1px;
+}
+
+.zoom-share-icon-wrap {
+  width: 24px;
+  height: 22px;
+  background: #22C55E;
+  color: #000000;
+  border-radius: 4px;
+  display: grid;
+  place-items: center;
+}
+
+.zoom-end-btn {
+  background: transparent;
+  border: none;
+  min-width: 58px;
+  height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 4px 6px;
+  transition: background 0.15s ease;
+}
+
+.zoom-end-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.zoom-end-circle {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #EF4444;
+  color: #FFFFFF;
+  display: grid;
+  place-items: center;
+  transition: transform 0.15s ease;
+}
+
+.zoom-end-btn:hover .zoom-end-circle {
+  transform: scale(1.08);
+}
+
+.zoom-end-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #EF4444;
+  margin-top: 3px;
+}
+
+/* In-meeting popovers (Audio, Video, React, Host Tools) */
+.zoom-inmeeting-popover {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  background: #1E1E22;
+  border: 1px solid #333338;
+  border-radius: 10px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.7);
+  padding: 6px;
+  z-index: 100;
+  animation: fadeIn 0.15s ease-out;
+  min-width: 220px;
+}
+
+.zoom-inmeeting-popover.react-tray {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 30px;
+  min-width: auto;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.zoom-react-emoji-btn {
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 6px;
+}
+
+.zoom-react-emoji-btn:hover {
+  transform: scale(1.35);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.zoom-popover-item {
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  color: #E5E7EB;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.15s ease;
+}
+
+.zoom-popover-item:hover {
+  background: #2D2D34;
+  color: #FFFFFF;
+}
+
+.zoom-popover-header {
+  font-size: 11px;
+  font-weight: 700;
+  color: #9CA3AF;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 6px 12px 4px;
+}
+
+.zoom-popover-divider {
+  height: 1px;
+  background: #333338;
+  margin: 4px 0;
+}
+
+/* In-meeting docked side panel (Participants / Chat) */
+.zoom-inmeeting-sidepanel {
+  width: 320px;
+  background: #18181B;
+  border-left: 1px solid #27272A;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  z-index: 35;
+  animation: slideLeft 0.2s ease-out;
+}
+
+@keyframes slideLeft {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.zoom-sidepanel-head {
+  height: 48px;
+  padding: 0 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #27272A;
+}
+
+.zoom-sidepanel-head h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #F3F4F6;
+  margin: 0;
+}
+
+.zoom-sidepanel-close {
+  background: transparent;
+  border: none;
+  color: #9CA3AF;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.zoom-sidepanel-close:hover {
+  background: #27272A;
+  color: #FFFFFF;
+}
+
+.zoom-sidepanel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.zoom-inmeeting-part-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.zoom-inmeeting-part-item:hover {
+  background: #27272A;
+}
+
+.zoom-part-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.zoom-part-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #3B82F6;
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+
+.zoom-part-name {
+  font-size: 13px;
+  color: #F3F4F6;
+  font-weight: 500;
+}
+
+.zoom-part-tag {
+  font-size: 11px;
+  color: #9CA3AF;
+  margin-left: 4px;
+}
+
+.zoom-part-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #9CA3AF;
+}
+
+.zoom-sidepanel-foot {
+  padding: 12px 16px;
+  border-top: 1px solid #27272A;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* In-meeting chat list */
+.zoom-inmeeting-chat-feed {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 8px;
+}
+
+.zoom-inmeeting-chat-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.zoom-inmeeting-chat-sender {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  color: #38BDF8;
+  font-weight: 600;
+}
+
+.zoom-inmeeting-chat-time {
+  font-size: 10.5px;
+  color: #71717A;
+  font-weight: 400;
+}
+
+.zoom-inmeeting-chat-bubble {
+  background: #27272A;
+  color: #F3F4F6;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.zoom-inmeeting-chat-input-wrap {
+  padding: 10px 16px 14px;
+  border-top: 1px solid #27272A;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.zoom-chat-recipient-bar {
+  font-size: 11px;
+  color: #9CA3AF;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.zoom-inmeeting-input-row {
+  display: flex;
+  gap: 6px;
+  background: #27272A;
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+
+.zoom-inmeeting-input-row input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  color: #FFFFFF;
+  font-family: inherit;
+}
+
+.zoom-inmeeting-send-btn {
+  background: #0B5CFF;
+  border: none;
+  color: #FFFFFF;
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.zoom-inmeeting-send-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Info popup card */
+.zoom-info-card-popup {
+  position: absolute;
+  top: 48px;
+  left: 16px;
+  width: 320px;
+  background: #18181B;
+  border: 1px solid #27272A;
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 16px 36px rgba(0,0,0,0.8);
+  z-index: 100;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.zoom-info-card-popup h4 {
+  font-size: 14px;
+  color: #FFFFFF;
+  margin: 0 0 12px;
+}
+
+.zoom-info-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 10px;
+}
+
+.zoom-info-row label {
+  font-size: 11px;
+  color: #9CA3AF;
+}
+
+.zoom-info-row span {
+  font-size: 13px;
+  color: #F3F4F6;
+  font-weight: 500;
+}
+
+.zoom-copy-link-btn {
+  background: #27272A;
+  border: 1px solid #3F3F46;
+  border-radius: 6px;
+  padding: 6px 12px;
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  margin-top: 4px;
+}
+
+.zoom-copy-link-btn:hover {
+  background: #3F3F46;
+}
+
+.zoom-encryption-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #22C55E;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #27272A;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+/* End meeting confirmation dialog */
+.zoom-end-confirm-dialog {
+  width: 380px;
+  background: #1E1E22;
+  border: 1px solid #333338;
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: scaleIn 0.2s ease-out;
+  text-align: center;
+}
+
+.zoom-end-confirm-dialog h3 {
+  font-size: 17px;
+  color: #FFFFFF;
+  margin: 0;
+}
+
+.zoom-end-confirm-dialog p {
+  font-size: 13px;
+  color: #9CA3AF;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.zoom-end-dialog-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.zoom-dialog-danger-btn {
+  background: #EF4444;
+  color: #FFFFFF;
+  border: none;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.zoom-dialog-danger-btn:hover {
+  background: #DC2626;
+}
+
+.zoom-dialog-secondary-btn {
+  background: #27272A;
+  color: #F3F4F6;
+  border: 1px solid #3F3F46;
+  padding: 9px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.zoom-dialog-secondary-btn:hover {
+  background: #3F3F46;
+}
+
+/* Participant controls & Host mute actions */
+.zoom-part-icon-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+}
+
+.zoom-part-btn-mute {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  border-radius: 4px;
+  padding: 3px 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  color: #22c55e;
+  transition: all 0.15s ease;
+}
+
+.zoom-part-btn-mute:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #ef4444;
+}
+
+.zoom-part-btn-mute:hover svg {
+  stroke: #ef4444;
+}
+
+.zoom-mute-hover-label {
+  display: none;
+  font-size: 10px;
+  font-weight: 600;
+  color: #ef4444;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.zoom-part-btn-mute:hover .zoom-mute-hover-label {
+  display: inline;
+}
+
+/* Host Mute All button in participants drawer */
+.zoom-mute-all-btn {
+  background: #27272A;
+  border: 1px solid #3F3F46;
+  border-radius: 6px;
+  padding: 8px 12px;
+  color: #F87171;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  cursor: pointer;
+  width: 100%;
+  transition: all 0.15s ease;
+}
+
+.zoom-mute-all-btn:hover {
+  background: #DC2626;
+  border-color: #EF4444;
+  color: #FFFFFF;
+}
+
+/* In-meeting notification toast (e.g. Host muted you) */
+.zoom-inmeeting-toast {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(24, 24, 27, 0.95);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  color: #FEE2E2;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.zoom-toast-close {
+  background: none;
+  border: none;
+  color: #9CA3AF;
+  cursor: pointer;
+  padding: 2px;
+  display: grid;
+  place-items: center;
+  margin-left: 6px;
+  border-radius: 4px;
+}
+
+.zoom-toast-close:hover {
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+

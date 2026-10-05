@@ -1,261 +1,259 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import {
-  CalendarDays,
-  ChevronRight,
-  LogIn,
-  Plus,
-  Video,
-  AlertCircle,
-} from 'lucide-react';
-
+import React, { useCallback, useEffect, useState } from 'react';
 import { api, formatInviteUrl } from '@/lib/api';
+import { getStoredUser, useAuth } from '@/lib/auth';
 import type { Meeting } from '@/types';
+import { isSeedMeeting } from '@/types';
 
-import { Sidebar } from '@/components/Sidebar';
-import { Topbar } from '@/components/Topbar';
-import { MeetingList } from '@/components/MeetingList';
-import { ScheduleModal } from '@/components/ScheduleModal';
+import { ZoomHeader } from '@/components/zoom/ZoomHeader';
+import { ZoomNavRail, ZoomTab } from '@/components/zoom/ZoomNavRail';
+import { HomeView } from '@/components/zoom/HomeView';
+import { MeetingsView } from '@/components/zoom/MeetingsView';
+import {
+  RecordingsModal,
+  SummariesModal,
+  NotesModal,
+} from '@/components/zoom/QuickModals';
 import { JoinModal } from '@/components/JoinModal';
+import { ScheduleModal } from '@/components/ScheduleModal';
+import { AuthModal } from '@/components/zoom/AuthModal';
 import { Toast } from '@/components/Toast';
 
-function getGreeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  return 'Good evening';
-}
+export default function ZoomWorkplaceDashboard() {
+  const { user, isLoggedIn } = useAuth();
 
-export default function Dashboard() {
+  // Navigation tab state
+  const [activeTab, setActiveTab] = useState<ZoomTab>('home');
+
+  // API data
   const [upcoming, setUpcoming] = useState<Meeting[]>([]);
   const [recent, setRecent] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [modal, setModal] = useState<'schedule' | 'join' | null>(null);
+
+  // Modals state
+  const [joinModalOpen, setJoinModalOpen] = useState(false);
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [recordingsOpen, setRecordingsOpen] = useState(false);
+  const [summariesOpen, setSummariesOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authPromptConfig, setAuthPromptConfig] = useState<{ title?: string; subtitle?: string }>({});
+  const [pendingAfterAuth, setPendingAfterAuth] = useState<'schedule' | null>(null);
   const [joinDefaultId, setJoinDefaultId] = useState('');
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [toast, setToast] = useState('');
 
-  const load = useCallback(async () => {
+  // Handle scheduling: require authentication first if not logged in
+  const handleOpenSchedule = () => {
+    if (isLoggedIn) {
+      setScheduleModalOpen(true);
+    } else {
+      setAuthPromptConfig({
+        title: 'Sign in to Schedule Meeting',
+        subtitle: 'Please sign in or create an account to schedule meetings and manage invites.',
+      });
+      setPendingAfterAuth('schedule');
+      setAuthModalOpen(true);
+    }
+  };
+
+  const handleAuthSuccess = () => {
+    if (pendingAfterAuth === 'schedule') {
+      setPendingAfterAuth(null);
+      setScheduleModalOpen(true);
+    }
+  };
+
+  const loadMeetings = useCallback(async () => {
     try {
       setError('');
       setLoading(true);
-      const [u, r] = await Promise.all([api.upcoming(), api.recent()]);
-      setUpcoming(u);
-      setRecent(r);
+      const [upcomingList, recentList] = await Promise.all([
+        api.upcoming().catch(() => []),
+        api.recent().catch(() => []),
+      ]);
+      setUpcoming(upcomingList);
+      setRecent(recentList);
     } catch (e) {
-      setError(
-        e instanceof Error
-          ? e.message
-          : 'Could not reach the meeting service.'
-      );
+      console.warn('Could not reach backend meetings endpoint:', e);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    loadMeetings();
+  }, [loadMeetings]);
 
-  const handleInstant = async () => {
+  // Start instant meeting
+  const handleStartInstant = async () => {
+    const curUser = getStoredUser();
+    const hostName = curUser?.display_name || 'Sahil Dargar';
     try {
       setError('');
       const m = await api.instant();
       const joined = await api.join({
         meeting_id: m.meeting_id,
-        display_name: 'Sahil Dargar',
+        display_name: hostName,
       });
-      window.location.href = `/meeting/${m.meeting_id}?session=${joined.session_id}&name=Sahil%20Dargar&host=true`;
+      window.location.href = `/meeting/${m.meeting_id}?session=${joined.session_id}&name=${encodeURIComponent(hostName)}&host=true`;
     } catch (e) {
-      setError(
-        e instanceof Error ? e.message : 'Unable to start meeting.'
-      );
+      // Fallback: create client-side room if backend offline
+      const mockId = Math.floor(100000 + Math.random() * 900000).toString();
+      window.location.href = `/meeting/${mockId}?session=sess_${Date.now()}&name=${encodeURIComponent(hostName)}&host=true`;
     }
   };
 
-  const handleCopy = async (m: Meeting) => {
+  // Launch specific meeting by ID (e.g. scheduled)
+  const handleStartMeetingById = async (id: string) => {
+    const cleanId = id.replace(/\s+/g, '');
+    const found = upcoming.find((m) => m.meeting_id === cleanId) || recent.find((m) => m.meeting_id === cleanId);
+    if (found && isSeedMeeting(found)) {
+      return; // Seed data: do nothing
+    }
+
+    const curUser = getStoredUser();
+    const hostName = curUser?.display_name || 'Sahil Dargar';
+    try {
+      const joined = await api.join({
+        meeting_id: cleanId,
+        display_name: hostName,
+      });
+      window.location.href = `/meeting/${cleanId}?session=${joined.session_id}&name=${encodeURIComponent(hostName)}&host=true`;
+    } catch (e) {
+      window.location.href = `/meeting/${id.replace(/\s+/g, '')}?session=sess_${Date.now()}&name=${encodeURIComponent(hostName)}&host=true`;
+    }
+  };
+
+  // Copy meeting invite
+  const handleCopyMeeting = async (m: Meeting) => {
+    if (isSeedMeeting(m)) return; // Seed data: do nothing
     try {
       const url = formatInviteUrl(m.invite_url, m.meeting_id, m.invite_token);
       await navigator.clipboard?.writeText(url);
-      setToast('Invitation link copied to clipboard');
+      setToast('Meeting invitation link copied to clipboard');
     } catch {
       setToast('Could not copy link');
     }
   };
 
-  const handleScheduled = (_meeting: Meeting) => {
-    setModal(null);
-    load();
+  // Copy custom invitation text
+  const handleCopyText = async (text: string) => {
+    try {
+      await navigator.clipboard?.writeText(text);
+      setToast('Invitation details copied to clipboard');
+    } catch {
+      setToast('Could not copy to clipboard');
+    }
+  };
+
+  // Handle scheduled meeting success
+  const handleScheduledSuccess = (_meeting: Meeting) => {
+    setScheduleModalOpen(false);
+    loadMeetings();
     setToast('Meeting scheduled successfully');
   };
 
   return (
-    <div className="shell">
-      <Sidebar
-        isOpen={mobileNavOpen}
-        onClose={() => setMobileNavOpen(false)}
-        onJoin={() => {
-          setMobileNavOpen(false);
-          setJoinDefaultId('');
-          setModal('join');
-        }}
-        onSchedule={() => {
-          setMobileNavOpen(false);
-          setModal('schedule');
-        }}
+    <div className="zoom-workplace-app">
+      {/* 1. Zoom Workplace Top Bar */}
+      <ZoomHeader
+        onNavigateTab={(tab) => setActiveTab(tab as ZoomTab)}
       />
 
-      <main className="main">
-        <Topbar onMenuClick={() => setMobileNavOpen(!mobileNavOpen)} />
+      {/* 2. Main Workspace Body (Rail + Content Pane) */}
+      <div className="zoom-workplace-body">
+        {/* Left Navigation Rail */}
+        <ZoomNavRail
+          activeTab={activeTab}
+          onSelectTab={setActiveTab}
+        />
 
-        <div className="content">
-          {/* Hero section */}
-          <div className="hero">
-            <div>
-              <div className="eyebrow">Your workspace</div>
-              <h1 suppressHydrationWarning>{getGreeting()}, Sahil</h1>
-              <p>Everything you need for your next conversation.</p>
-            </div>
-            <div className="actions">
-              <button
-                className="btn btn-light"
-                onClick={() => setModal('join')}
-              >
-                <LogIn size={15} />
-                Join
-              </button>
-              <button className="btn btn-primary" onClick={handleInstant}>
-                <Plus size={16} />
-                New meeting
-              </button>
-            </div>
-          </div>
-
-          {/* Action cards */}
-          <div className="action-grid">
-            <button className="action-card" onClick={handleInstant}>
-              <span className="action-icon blue">
-                <Video size={20} />
-              </span>
-              <span>
-                <h3>New meeting</h3>
-                <p>Start an instant room</p>
-              </span>
-              <ChevronRight
-                size={16}
-                color="var(--subtle)"
-                style={{ marginLeft: 'auto' }}
-              />
-            </button>
-
-            <button
-              className="action-card"
-              onClick={() => setModal('join')}
-            >
-              <span className="action-icon violet">
-                <LogIn size={20} />
-              </span>
-              <span>
-                <h3>Join a meeting</h3>
-                <p>Use an ID or invite link</p>
-              </span>
-              <ChevronRight
-                size={16}
-                color="var(--subtle)"
-                style={{ marginLeft: 'auto' }}
-              />
-            </button>
-
-            <button
-              className="action-card"
-              onClick={() => setModal('schedule')}
-            >
-              <span className="action-icon green">
-                <CalendarDays size={20} />
-              </span>
-              <span>
-                <h3>Schedule</h3>
-                <p>Plan it for later</p>
-              </span>
-              <ChevronRight
-                size={16}
-                color="var(--subtle)"
-                style={{ marginLeft: 'auto' }}
-              />
-            </button>
-          </div>
-
-          {/* Error banner */}
-          {error && (
-            <div className="error-banner">
-              <AlertCircle size={16} />
-              <span>{error}</span>
-              <button
-                className="link"
-                onClick={load}
-                style={{ marginLeft: 'auto' }}
-              >
-                Try again
-              </button>
-            </div>
+        {/* Content View Router */}
+        <main className="zoom-workplace-main">
+          {activeTab === 'home' && (
+            <HomeView
+              onStartInstant={handleStartInstant}
+              onOpenJoin={() => {
+                setJoinDefaultId('');
+                setJoinModalOpen(true);
+              }}
+              onOpenSchedule={handleOpenSchedule}
+              onOpenRecordings={() => setRecordingsOpen(true)}
+              onOpenSummaries={() => setSummariesOpen(true)}
+              onOpenNotes={() => setNotesOpen(true)}
+              upcomingMeetings={upcoming}
+              recentMeetings={recent}
+              onCopyMeeting={handleCopyMeeting}
+              onJoinMeeting={(m) => {
+                setJoinDefaultId(m.meeting_id);
+                setJoinModalOpen(true);
+              }}
+            />
           )}
 
-          {/* Upcoming meetings */}
-          <MeetingList
-            title="Upcoming meetings"
-            meetings={upcoming}
-            loading={loading}
-            emptyIcon="calendar"
-            emptyTitle="No upcoming meetings"
-            emptySubtitle="Your schedule is clear. Create a room when you're ready."
-            onCopy={handleCopy}
-            onJoin={(m) => {
-              setJoinDefaultId(m.meeting_id);
-              setModal('join');
-            }}
-            action={{
-              label: 'View calendar',
-              onClick: () => setModal('schedule'),
-            }}
-          />
-
-          {/* Recent meetings */}
-          <div style={{ marginTop: 36 }}>
-            <MeetingList
-              title="Recent meetings"
-              subtitle="Last 10 rooms"
-              meetings={recent}
-              loading={loading}
-              emptyIcon="file"
-              emptyTitle="No recent meetings yet"
-              emptySubtitle="Completed meetings will appear here."
-              onCopy={handleCopy}
+          {activeTab === 'meetings' && (
+            <MeetingsView
+              upcomingMeetings={upcoming}
+              recentMeetings={recent}
+              onRefresh={loadMeetings}
+              onStartMeeting={handleStartMeetingById}
+              onCopyText={handleCopyText}
+              onOpenSchedule={handleOpenSchedule}
             />
-          </div>
-        </div>
-      </main>
+          )}
+        </main>
+      </div>
 
-      {/* Modals */}
-      {modal === 'schedule' && (
-        <ScheduleModal
-          onClose={() => setModal(null)}
-          onCreated={handleScheduled}
-        />
-      )}
+      {/* 3. Modals & Dialogs */}
 
-      {modal === 'join' && (
+      {joinModalOpen && (
         <JoinModal
           defaultMeetingId={joinDefaultId}
           onClose={() => {
-            setModal(null);
+            setJoinModalOpen(false);
             setJoinDefaultId('');
           }}
         />
       )}
 
-      {/* Toast */}
+      {scheduleModalOpen && (
+        <ScheduleModal
+          onClose={() => setScheduleModalOpen(false)}
+          onCreated={handleScheduledSuccess}
+          onRequireAuth={handleOpenSchedule}
+        />
+      )}
+
+      {/* Authentication Modal for Scheduling & User Actions */}
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => {
+          setAuthModalOpen(false);
+          setPendingAfterAuth(null);
+        }}
+        title={authPromptConfig.title}
+        subtitle={authPromptConfig.subtitle}
+        onSuccess={handleAuthSuccess}
+      />
+
+      <RecordingsModal
+        isOpen={recordingsOpen}
+        onClose={() => setRecordingsOpen(false)}
+      />
+
+      <SummariesModal
+        isOpen={summariesOpen}
+        onClose={() => setSummariesOpen(false)}
+      />
+
+      <NotesModal
+        isOpen={notesOpen}
+        onClose={() => setNotesOpen(false)}
+      />
+
+      {/* 4. Notification Toast */}
       {toast && (
         <Toast message={toast} onDismiss={() => setToast('')} />
       )}

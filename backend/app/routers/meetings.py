@@ -7,8 +7,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..auth import get_current_user_optional
 from ..database import get_db, utcnow
-from ..models import Meeting, MeetingHistory, Participant
+from ..models import Meeting, MeetingHistory, Participant, User
 from ..schemas import (
     JoinOut,
     JoinRequest,
@@ -34,11 +35,37 @@ def _base_url(request: Request) -> str:
     return get_frontend_base(request)
 
 
-def _get_meeting(db: Session, meeting_id: str) -> Meeting:
+def _get_meeting(db: Session, meeting_id: str, auto_create: bool = True) -> Meeting:
+    clean_id = meeting_id.strip()
     meeting = db.scalar(
-        select(Meeting).where(Meeting.meeting_id == meeting_id)
+        select(Meeting).where(Meeting.meeting_id == clean_id)
     )
     if not meeting:
+        if auto_create:
+            now = utcnow()
+            meeting = Meeting(
+                meeting_id=clean_id,
+                invite_token=secrets.token_urlsafe(32),
+                title=f"Zoom Meeting {clean_id}",
+                description="Active Zoom Meeting Room",
+                host_name=HOST_NAME,
+                scheduled_time=now,
+                duration_minutes=60,
+                status="active",
+                created_at=now,
+            )
+            db.add(meeting)
+            db.flush()
+            db.add(
+                MeetingHistory(
+                    meeting_id=meeting.id,
+                    action="created:on-demand",
+                    timestamp=now,
+                )
+            )
+            db.commit()
+            db.refresh(meeting)
+            return meeting
         raise HTTPException(
             status_code=404,
             detail="Meeting not found. Check the meeting ID or invitation link.",
@@ -57,12 +84,17 @@ def _output(meeting: Meeting, request: Request) -> MeetingOut:
 @router.post(
     "/instant", response_model=MeetingOut, status_code=status.HTTP_201_CREATED
 )
-def instant(request: Request, db: Session = Depends(get_db)):
+def instant(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_current_user_optional),
+):
     """Create and immediately activate an instant meeting."""
     now = utcnow()
+    host_display_name = current_user.display_name if current_user else HOST_NAME
     data = create_meeting(
         db,
-        title="Instant meeting",
+        title=f"{host_display_name}'s Zoom Meeting" if current_user else "Instant meeting",
         description="A new meeting room created on the fly.",
         scheduled_time=now,
         duration=60,
@@ -72,6 +104,9 @@ def instant(request: Request, db: Session = Depends(get_db)):
     obj = db.scalar(
         select(Meeting).where(Meeting.meeting_id == data["meeting_id"])
     )
+    if current_user:
+        obj.host_name = current_user.display_name
+        obj.user_id = current_user.id
     # create_meeting already committed with status="active", just ensure history
     db.add(
         MeetingHistory(meeting_id=obj.id, action="started", timestamp=now)
@@ -88,14 +123,21 @@ def schedule(
     payload: MeetingBase,
     request: Request,
     db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_current_user_optional),
 ):
-    """Schedule a meeting for a future time."""
+    """Schedule a meeting for a future time. Requires authentication."""
+    if not current_user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required to schedule a meeting. Please sign in first.",
+        )
+
     if payload.scheduled_time <= utcnow():
         raise HTTPException(
             status_code=422,
             detail="Scheduled time must be in the future.",
         )
-    return create_meeting(
+    created = create_meeting(
         db,
         title=payload.title,
         description=payload.description,
@@ -103,11 +145,19 @@ def schedule(
         duration=payload.duration_minutes,
         base_url=_base_url(request),
     )
+    obj = db.scalar(select(Meeting).where(Meeting.meeting_id == created["meeting_id"]))
+    if obj:
+        obj.host_name = current_user.display_name
+        obj.user_id = current_user.id
+        db.commit()
+        db.refresh(obj)
+        return _output(obj, request)
+    return MeetingOut(**created)
 
 
 @router.get("/upcoming", response_model=list[MeetingOut])
 def upcoming(request: Request, db: Session = Depends(get_db)):
-    """Return scheduled or active meetings that haven't ended."""
+    """Return scheduled or active meetings that haven't ended (5 entries)."""
     cutoff = utcnow() - timedelta(minutes=5)
     meetings = (
         db.scalars(
@@ -117,6 +167,7 @@ def upcoming(request: Request, db: Session = Depends(get_db)):
                 Meeting.scheduled_time >= cutoff,
             )
             .order_by(Meeting.scheduled_time)
+            .limit(5)
         )
         .all()
     )
@@ -125,17 +176,38 @@ def upcoming(request: Request, db: Session = Depends(get_db)):
 
 @router.get("/recent", response_model=list[MeetingOut])
 def recent(request: Request, db: Session = Depends(get_db)):
-    """Return the 10 most-recently ended meetings."""
-    meetings = (
+    """Return recently ended meetings (5 entries), plus any currently active meetings if host is still conducting."""
+    now = utcnow()
+    active_cutoff = now - timedelta(hours=2)
+
+    # 1. Meetings that are currently active (e.g. host is still conducting)
+    active_meetings = (
+        db.scalars(
+            select(Meeting)
+            .where(
+                Meeting.status == "active",
+                Meeting.created_at >= active_cutoff,
+            )
+            .order_by(Meeting.created_at.desc())
+            .limit(5)
+        )
+        .all()
+    )
+
+    # 2. Recently ended meetings for pure history records (keep 5 entries)
+    max_ended = max(1, 5 - len(active_meetings))
+    ended_meetings = (
         db.scalars(
             select(Meeting)
             .where(Meeting.status == "ended")
             .order_by(Meeting.ended_at.desc().nullslast())
-            .limit(10)
+            .limit(max_ended if active_meetings else 5)
         )
         .all()
     )
-    return [_output(m, request) for m in meetings]
+
+    combined = list(active_meetings) + list(ended_meetings)
+    return [_output(m, request) for m in combined[:5]]
 
 
 @router.get("/{meeting_id}", response_model=MeetingOut)
@@ -153,6 +225,7 @@ def join(
     payload: JoinRequest,
     request: Request,
     db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_current_user_optional),
 ):
     """Register a participant into a meeting and activate it if needed."""
     meeting = _get_meeting(db, payload.meeting_id)
@@ -164,6 +237,33 @@ def join(
         )
 
     session_id = payload.session_id or secrets.token_urlsafe(18)
+    display_name_to_use = payload.display_name or (current_user.display_name if current_user else "Participant")
+
+    # Check if there is already an active host in this meeting
+    active_host = db.scalar(
+        select(Participant).where(
+            Participant.meeting_id == meeting.id,
+            Participant.is_host.is_(True),
+            Participant.left_at.is_(None),
+        )
+    )
+
+    # Determine whether this participant is the host:
+    # 1. If payload explicitly asks is_host=False, never host.
+    # 2. If an active host already exists with a different session_id, newcomer is never host!
+    # 3. If payload explicitly asks is_host=True, then host.
+    # 4. If current_user matches meeting creator (user_id): host.
+    # 5. Otherwise, only host if no active host exists in room and display_name matches meeting.host_name.
+    if payload.is_host is False:
+        determined_is_host = False
+    elif active_host and active_host.session_id != session_id:
+        determined_is_host = False
+    elif payload.is_host is True:
+        determined_is_host = True
+    elif current_user and meeting.user_id and meeting.user_id == current_user.id:
+        determined_is_host = not active_host
+    else:
+        determined_is_host = (not active_host and display_name_to_use == meeting.host_name)
 
     # Re-join or create
     existing = db.scalar(
@@ -174,8 +274,10 @@ def join(
     )
     if existing:
         existing.left_at = None
-        existing.display_name = payload.display_name
-        existing.is_host = (payload.display_name == HOST_NAME)
+        existing.display_name = display_name_to_use
+        existing.is_host = determined_is_host
+        if current_user:
+            existing.user_id = current_user.id
         participant = existing
     else:
         # Prevent unique constraint collision if session_id exists in another meeting
@@ -187,8 +289,9 @@ def join(
 
         participant = Participant(
             meeting_id=meeting.id,
-            display_name=payload.display_name,
-            is_host=(payload.display_name == HOST_NAME),
+            user_id=current_user.id if current_user else None,
+            display_name=display_name_to_use,
+            is_host=determined_is_host,
             joined_at=utcnow(),
             session_id=session_id,
         )
@@ -233,9 +336,7 @@ def leave(
         )
     )
     if not participant:
-        raise HTTPException(
-            status_code=404, detail="Active participant session not found."
-        )
+        return {"ok": True}
     participant.left_at = utcnow()
     db.add(
         MeetingHistory(

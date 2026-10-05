@@ -1,29 +1,38 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import {
-  CalendarDays,
-  LoaderCircle,
-  X,
-} from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { LoaderCircle, X, Calendar } from 'lucide-react';
 import { api } from '@/lib/api';
 import type { Meeting } from '@/types';
+import { useAuth } from '@/lib/auth';
 
 interface ScheduleModalProps {
   onClose: () => void;
   onCreated: (meeting: Meeting) => void;
+  onRequireAuth?: () => void;
 }
 
-export function ScheduleModal({ onClose, onCreated }: ScheduleModalProps) {
-  const [form, setForm] = useState({
-    title: '',
-    description: '',
-    date: '',
-    time: '',
-    duration: '30',
+export function ScheduleModal({ onClose, onCreated, onRequireAuth }: ScheduleModalProps) {
+  const { user, isLoggedIn } = useAuth();
+  const [title, setTitle] = useState(() => (user?.display_name ? `${user.display_name}'s Meeting` : 'My Meeting'));
+  const [description, setDescription] = useState('');
+  const [date, setDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0];
   });
+  const [time, setTime] = useState('11:00');
+  const [duration, setDuration] = useState('30');
+
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
+  // Sync title with user display name if it becomes available
+  useEffect(() => {
+    if (user?.display_name && title === 'My Meeting') {
+      setTitle(`${user.display_name}'s Meeting`);
+    }
+  }, [user, title]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -33,30 +42,19 @@ export function ScheduleModal({ onClose, onCreated }: ScheduleModalProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  const update = (field: string, value: string) =>
-    setForm((prev) => ({ ...prev, [field]: value }));
-
   const submit = async () => {
-    if (!form.title.trim()) {
+    if (!title.trim()) {
       setError('Please enter a meeting title.');
       return;
     }
-    if (form.title.trim().length < 2) {
-      setError('Title must be at least 2 characters.');
-      return;
-    }
-    if (!form.date || !form.time) {
-      setError('Please select a date and time.');
+    if (!date || !time) {
+      setError('Please select a date and start time.');
       return;
     }
 
-    const localDate = new Date(`${form.date}T${form.time}`);
+    const localDate = new Date(`${date}T${time}`);
     if (isNaN(localDate.getTime())) {
       setError('Please enter a valid date and time.');
-      return;
-    }
-    if (localDate.getTime() <= Date.now()) {
-      setError('Scheduled time must be in the future.');
       return;
     }
 
@@ -65,10 +63,10 @@ export function ScheduleModal({ onClose, onCreated }: ScheduleModalProps) {
 
     try {
       const meeting = await api.schedule({
-        title: form.title.trim(),
-        description: form.description.trim() || undefined,
+        title: title.trim(),
+        description: description.trim() || undefined,
         scheduled_time: localDate.toISOString(),
-        duration_minutes: Number(form.duration),
+        duration_minutes: Number(duration),
       });
       onCreated(meeting);
     } catch (e) {
@@ -80,100 +78,174 @@ export function ScheduleModal({ onClose, onCreated }: ScheduleModalProps) {
     }
   };
 
+  if (!isLoggedIn) {
+    return (
+      <div
+        className="zoom-modal-backdrop"
+        onClick={onClose}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div
+          className="zoom-dialog-modal"
+          style={{ width: 440, padding: 0, overflow: 'hidden' }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="zoom-dialog-head">
+            <h3>Sign in Required</h3>
+            <button className="zoom-dialog-close" onClick={onClose} aria-label="Close modal">
+              <X size={16} />
+            </button>
+          </div>
+          <div className="zoom-dialog-body" style={{ padding: '24px 20px' }}>
+            <p style={{ margin: '0 0 16px', color: '#475569', fontSize: 13.5, lineHeight: 1.5 }}>
+              You need to sign in to your Zoom Workplace account to schedule a meeting.
+            </p>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                className="btn btn-outline"
+                style={{ flex: 1, padding: '10px' }}
+                onClick={onClose}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                style={{ flex: 1, padding: '10px' }}
+                onClick={() => {
+                  onClose();
+                  onRequireAuth?.();
+                }}
+              >
+                Sign In / Register
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
-      className="modal-bg"
+      className="zoom-modal-backdrop"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="schedule-modal-title"
     >
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <div>
-            <div className="eyebrow">Plan ahead</div>
-            <h2 id="schedule-modal-title">Schedule a meeting</h2>
-          </div>
-          <button className="close" onClick={onClose} aria-label="Close modal">
+      <div className="zoom-dialog-modal" style={{ maxWidth: 500, width: '100%' }} onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="zoom-dialog-head">
+          <h3 id="schedule-modal-title">Schedule Meeting</h3>
+          <button className="zoom-dialog-close" onClick={onClose} aria-label="Close modal">
             <X size={16} />
           </button>
         </div>
 
-        <div className="field">
-          <label htmlFor="sched-title">Meeting title</label>
-          <input
-            id="sched-title"
-            value={form.title}
-            onChange={(e) => update('title', e.target.value)}
-            placeholder="e.g. Product design review"
-            autoFocus
-          />
-        </div>
-
-        <div className="field">
-          <label htmlFor="sched-desc">
-            Description <span className="optional">(optional)</span>
-          </label>
-          <textarea
-            id="sched-desc"
-            value={form.description}
-            onChange={(e) => update('description', e.target.value)}
-            placeholder="What should participants prepare?"
-          />
-        </div>
-
-        <div className="form-row">
-          <div className="field">
-            <label htmlFor="sched-date">Date</label>
+        {/* Form Body */}
+        <div className="zoom-dialog-body" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* 1. Title */}
+          <div className="zoom-form-field">
+            <label htmlFor="sched-title">
+              Title <span style={{ color: '#EF4444' }}>*</span>
+            </label>
             <input
-              id="sched-date"
-              type="date"
-              value={form.date}
-              onChange={(e) => update('date', e.target.value)}
+              id="sched-title"
+              className="zoom-input"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. Weekly Team Sync"
+              autoFocus
             />
           </div>
-          <div className="field">
-            <label htmlFor="sched-time">Time</label>
-            <input
-              id="sched-time"
-              type="time"
-              value={form.time}
-              onChange={(e) => update('time', e.target.value)}
+
+          {/* 2. Description (not compulsory) */}
+          <div className="zoom-form-field">
+            <label htmlFor="sched-description">
+              Description <span style={{ color: '#94A3B8', fontWeight: 400, fontSize: 12 }}>(Optional)</span>
+            </label>
+            <textarea
+              id="sched-description"
+              className="zoom-textarea"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Add meeting agenda or notes (optional)..."
+              rows={3}
             />
           </div>
+
+          {/* 3. Date & Time Picker */}
+          <div className="zoom-form-row">
+            <div className="zoom-form-field" style={{ flex: 1 }}>
+              <label htmlFor="sched-date">
+                Date <span style={{ color: '#EF4444' }}>*</span>
+              </label>
+              <input
+                id="sched-date"
+                type="date"
+                className="zoom-input"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </div>
+
+            <div className="zoom-form-field" style={{ width: 140 }}>
+              <label htmlFor="sched-time">
+                Start Time <span style={{ color: '#EF4444' }}>*</span>
+              </label>
+              <input
+                id="sched-time"
+                type="time"
+                className="zoom-input"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+              />
+            </div>
+          </div>
+
+          {/* 4. Duration */}
+          <div className="zoom-form-field">
+            <label htmlFor="sched-duration">Duration</label>
+            <select
+              id="sched-duration"
+              className="zoom-select"
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+            >
+              <option value="15">15 minutes</option>
+              <option value="30">30 minutes</option>
+              <option value="45">45 minutes</option>
+              <option value="60">1 hour (60 min)</option>
+              <option value="90">1.5 hours (90 min)</option>
+              <option value="120">2 hours (120 min)</option>
+              <option value="180">3 hours</option>
+              <option value="240">4 hours</option>
+            </select>
+          </div>
+
+          {error && <p className="zoom-form-error">{error}</p>}
         </div>
 
-        <div className="field">
-          <label htmlFor="sched-duration">Duration</label>
-          <select
-            id="sched-duration"
-            value={form.duration}
-            onChange={(e) => update('duration', e.target.value)}
+        {/* Footer */}
+        <div className="zoom-dialog-footer">
+          <button className="zoom-btn-outline" onClick={onClose} type="button">
+            Cancel
+          </button>
+          <button
+            className="zoom-btn-primary"
+            onClick={submit}
+            disabled={busy}
+            type="button"
           >
-            <option value="15">15 minutes</option>
-            <option value="30">30 minutes</option>
-            <option value="45">45 minutes</option>
-            <option value="60">1 hour</option>
-            <option value="90">90 minutes</option>
-            <option value="120">2 hours</option>
-          </select>
+            {busy ? (
+              <LoaderCircle size={15} className="spin" />
+            ) : (
+              <Calendar size={15} />
+            )}
+            <span>{busy ? 'Saving...' : 'Save'}</span>
+          </button>
         </div>
-
-        {error && <p className="form-error" role="alert">{error}</p>}
-
-        <button
-          className="btn btn-primary"
-          style={{ width: '100%', marginTop: 4 }}
-          onClick={submit}
-          disabled={busy}
-        >
-          {busy ? (
-            <LoaderCircle size={15} className="spin" />
-          ) : (
-            <CalendarDays size={15} />
-          )}
-          {busy ? 'Creating...' : 'Schedule meeting'}
-        </button>
       </div>
     </div>
   );

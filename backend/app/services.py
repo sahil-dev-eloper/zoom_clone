@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from urllib.parse import urlparse
 
 from fastapi import Request
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from .database import utcnow
@@ -101,6 +101,7 @@ def meeting_out(meeting: Meeting, base_url: str) -> dict:
         "participant_count": sum(
             1 for p in meeting.participants if p.left_at is None
         ),
+        "is_seed": bool(getattr(meeting, "is_seed", False)),
     }
 
 
@@ -151,75 +152,148 @@ def create_meeting(
     return meeting_out(meeting, base_url)
 
 
-# ---- Seed data (runs once if the table is empty) -------------------------
+# ---- Seed data (5 upcoming, 5 recent) ------------------------------------
 
-_SEED = [
+_SEED_UPCOMING = [
     (
-        "Product design sync",
-        timedelta(days=1, hours=2),
+        "Product Design Sync",
+        timedelta(hours=3),
         45,
         "scheduled",
         "Review the refreshed onboarding journey and component library.",
     ),
     (
-        "Engineering standup",
-        timedelta(days=2, hours=5),
+        "Engineering Standup",
+        timedelta(days=1, hours=4),
         30,
         "scheduled",
         "Daily team alignment, blockers, and sprint check-in.",
     ),
     (
-        "Client strategy review",
-        timedelta(days=3, hours=1),
+        "Client Strategy Review",
+        timedelta(days=2, hours=2),
         60,
         "scheduled",
         "Quarterly roadmap walkthrough with stakeholders.",
     ),
     (
-        "Q3 planning room",
-        timedelta(days=-2),
-        60,
-        "ended",
-        "Quarterly planning and priorities.",
+        "Design System Workshop",
+        timedelta(days=3, hours=5),
+        45,
+        "scheduled",
+        "Exploring typography tokens, icons, and layout updates.",
     ),
     (
-        "Marketing debrief",
-        timedelta(days=-5),
-        45,
-        "ended",
-        "Post-campaign analysis and key learnings.",
+        "Weekly Executive Sync",
+        timedelta(days=4, hours=1),
+        30,
+        "scheduled",
+        "Leadership updates, metrics review, and organizational milestones.",
     ),
 ]
 
+_SEED_RECENT = [
+    (
+        "Sprint Retrospective",
+        timedelta(days=-1, hours=-2),
+        45,
+        "ended",
+        "Reviewing completed sprint deliverables, successes, and improvements.",
+    ),
+    (
+        "Q3 Planning Room",
+        timedelta(days=-2, hours=-3),
+        60,
+        "ended",
+        "Quarterly planning, resource allocation, and priorities.",
+    ),
+    (
+        "Product Architecture Review",
+        timedelta(days=-3, hours=-1),
+        45,
+        "ended",
+        "Deep dive into real-time audio/video streaming infrastructure.",
+    ),
+    (
+        "Marketing Debrief",
+        timedelta(days=-4, hours=-4),
+        45,
+        "ended",
+        "Post-campaign analysis, reach metrics, and key learnings.",
+    ),
+    (
+        "All-Hands Kickoff",
+        timedelta(days=-6, hours=-2),
+        60,
+        "ended",
+        "Company-wide kickoff meeting and quarter goal alignments.",
+    ),
+]
 
-def seed_meetings(db: Session, base_url: str) -> None:
-    """Insert realistic demo meetings if the table is empty."""
-    if db.scalar(select(Meeting.id).limit(1)):
-        return  # already seeded
+_SEED = _SEED_UPCOMING + _SEED_RECENT
 
+
+def seed_meetings(db: Session, base_url: str, force: bool = False) -> None:
+    """Ensure exactly 5 upcoming and 5 recent realistic demo meetings exist."""
     now = utcnow()
-    for title, offset, duration, status, desc in _SEED:
-        meeting_id, token = unique_ids(db)
-        meeting = Meeting(
-            meeting_id=meeting_id,
-            invite_token=token,
-            title=title,
-            description=desc,
-            host_name=HOST_NAME,
-            scheduled_time=now + offset,
-            duration_minutes=duration,
-            status=status,
-            created_at=now - timedelta(days=4),
+    if force:
+        db.execute(delete(Participant))
+        db.execute(delete(MeetingHistory))
+        db.execute(delete(Meeting).where(Meeting.user_id.is_(None)))
+        db.commit()
+
+    # Check upcoming count
+    upcoming_count = db.scalar(
+        select(func.count(Meeting.id)).where(
+            Meeting.status.in_(["scheduled", "active"]),
+            Meeting.scheduled_time >= now - timedelta(minutes=5),
         )
-        if status == "ended":
-            meeting.ended_at = now + offset + timedelta(minutes=duration)
-        db.add(meeting)
-        db.flush()
-        db.add(
-            MeetingHistory(
-                meeting_id=meeting.id,
-                action="seeded",
-                timestamp=now - timedelta(days=4),
+    ) or 0
+
+    if upcoming_count < 5:
+        needed = 5 - upcoming_count
+        for title, offset, duration, status, desc in _SEED_UPCOMING[-needed:]:
+            meeting_id, token = unique_ids(db)
+            meeting = Meeting(
+                meeting_id=meeting_id,
+                invite_token=token,
+                title=title,
+                description=desc,
+                host_name=HOST_NAME,
+                scheduled_time=now + offset,
+                duration_minutes=duration,
+                status=status,
+                created_at=now - timedelta(days=2),
+                is_seed=True,
             )
-        )
-    db.commit()
+            db.add(meeting)
+            db.flush()
+            db.add(MeetingHistory(meeting_id=meeting.id, action="seeded", timestamp=now))
+        db.commit()
+
+    # Check ended recent count
+    recent_count = db.scalar(
+        select(func.count(Meeting.id)).where(Meeting.status == "ended")
+    ) or 0
+
+    if recent_count < 5:
+        needed = 5 - recent_count
+        for title, offset, duration, status, desc in _SEED_RECENT[-needed:]:
+            meeting_id, token = unique_ids(db)
+            meeting = Meeting(
+                meeting_id=meeting_id,
+                invite_token=token,
+                title=title,
+                description=desc,
+                host_name=HOST_NAME,
+                scheduled_time=now + offset,
+                duration_minutes=duration,
+                status=status,
+                created_at=now + offset - timedelta(hours=1),
+                ended_at=now + offset + timedelta(minutes=duration),
+                is_seed=True,
+            )
+            db.add(meeting)
+            db.flush()
+            db.add(MeetingHistory(meeting_id=meeting.id, action="seeded", timestamp=now))
+        db.commit()
