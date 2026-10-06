@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, LoaderCircle, LogIn, Video } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, isHostedMeetingId } from '@/lib/api';
 import { getStoredUser } from '@/lib/auth';
 import type { AuthUser } from '@/types';
 
@@ -50,15 +50,18 @@ function JoinForm() {
       const meetingId = extractMeetingId(initialMeeting);
       if (meetingId) {
         setBusy(true);
+        const isHosted = isHostedMeetingId(meetingId);
         api.join({
           meeting_id: meetingId,
           display_name: stored.display_name,
-          is_host: false,
+          is_host: isHosted ? true : undefined,
         }).then((result) => {
-          window.location.href = `/meeting/${result.meeting.meeting_id}?session=${result.session_id}&name=${encodeURIComponent(stored.display_name)}`;
+          const hostFlag = (result.is_host || isHosted) ? '&host=true' : '';
+          window.location.href = `/meeting/${result.meeting.meeting_id}?session=${result.session_id}&name=${encodeURIComponent(stored.display_name)}${hostFlag}`;
         }).catch(() => {
           const fallbackSession = 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
-          window.location.href = `/meeting/${meetingId}?session=${fallbackSession}&name=${encodeURIComponent(stored.display_name)}`;
+          const hostFlag = isHosted ? '&host=true' : '';
+          window.location.href = `/meeting/${meetingId}?session=${fallbackSession}&name=${encodeURIComponent(stored.display_name)}${hostFlag}`;
         });
       }
     }
@@ -79,18 +82,22 @@ function JoinForm() {
     setBusy(true);
     setError('');
 
+    const isHosted = isHostedMeetingId(meetingId);
+
     try {
       const result = await api.join({
         meeting_id: meetingId,
         display_name: nameToUse,
-        is_host: false,
+        is_host: isHosted ? true : undefined,
       });
-      window.location.href = `/meeting/${result.meeting.meeting_id}?session=${result.session_id}&name=${encodeURIComponent(nameToUse)}`;
+      const hostFlag = (result.is_host || isHosted) ? '&host=true' : '';
+      window.location.href = `/meeting/${result.meeting.meeting_id}?session=${result.session_id}&name=${encodeURIComponent(nameToUse)}${hostFlag}`;
     } catch {
       // Backend doesn't know this meeting or is offline — redirect to the
       // meeting room page directly as participant.
       const fallbackSession = 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
-      window.location.href = `/meeting/${meetingId}?session=${fallbackSession}&name=${encodeURIComponent(nameToUse)}`;
+      const hostFlag = isHosted ? '&host=true' : '';
+      window.location.href = `/meeting/${meetingId}?session=${fallbackSession}&name=${encodeURIComponent(nameToUse)}${hostFlag}`;
     } finally {
       setBusy(false);
     }

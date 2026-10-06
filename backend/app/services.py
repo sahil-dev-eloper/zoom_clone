@@ -127,15 +127,19 @@ def create_meeting(
     base_url: str,
     status: str = "scheduled",
     is_seed: bool = False,
+    user_id: int | None = None,
+    host_name: str | None = None,
 ) -> dict:
     """Insert a new meeting and its initial history entry."""
     meeting_id, token = unique_ids(db)
+    final_host = (host_name or HOST_NAME).strip()
     meeting = Meeting(
         meeting_id=meeting_id,
         invite_token=token,
         title=title,
         description=description,
-        host_name=HOST_NAME,
+        host_name=final_host,
+        user_id=user_id,
         scheduled_time=scheduled_time,
         duration_minutes=duration,
         status=status,

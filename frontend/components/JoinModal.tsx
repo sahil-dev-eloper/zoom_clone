@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { LoaderCircle, X, LogIn } from 'lucide-react';
-import { api } from '@/lib/api';
+import { api, isHostedMeetingId } from '@/lib/api';
+import { getStoredUser } from '@/lib/auth';
 
 interface JoinModalProps {
   onClose: () => void;
@@ -22,7 +23,13 @@ function extractMeetingId(input: string): string {
 
 export function JoinModal({ onClose, defaultMeetingId }: JoinModalProps) {
   const [meetingInput, setMeetingInput] = useState(defaultMeetingId || '');
-  const [displayName, setDisplayName] = useState('');
+  const [displayName, setDisplayName] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const stored = getStoredUser();
+      if (stored?.display_name) return stored.display_name;
+    }
+    return '';
+  });
   const [rememberName, setRememberName] = useState(true);
   const [noAudio, setNoAudio] = useState(false);
   const [turnOffVideo, setTurnOffVideo] = useState(false);
@@ -51,21 +58,25 @@ export function JoinModal({ onClose, defaultMeetingId }: JoinModalProps) {
     setBusy(true);
     setError('');
 
+    const isHosted = isHostedMeetingId(meetingId);
+
     try {
       const result = await api.join({
         meeting_id: meetingId,
         display_name: displayName.trim(),
-        is_host: false,
+        is_host: isHosted ? true : undefined,
       });
       const videoFlag = turnOffVideo ? '&video=false' : '';
       const audioFlag = noAudio ? '&audio=false' : '';
-      window.location.href = `/meeting/${result.meeting.meeting_id}?session=${result.session_id}&name=${encodeURIComponent(displayName.trim())}${videoFlag}${audioFlag}`;
+      const hostFlag = (result.is_host || isHosted) ? '&host=true' : '';
+      window.location.href = `/meeting/${result.meeting.meeting_id}?session=${result.session_id}&name=${encodeURIComponent(displayName.trim())}${hostFlag}${videoFlag}${audioFlag}`;
     } catch {
-      // Resilient fallback: redirect to room directly as participant
+      // Resilient fallback: redirect to room
       const fallbackSession = 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
       const videoFlag = turnOffVideo ? '&video=false' : '';
       const audioFlag = noAudio ? '&audio=false' : '';
-      window.location.href = `/meeting/${meetingId}?session=${fallbackSession}&name=${encodeURIComponent(displayName.trim())}${videoFlag}${audioFlag}`;
+      const hostFlag = isHosted ? '&host=true' : '';
+      window.location.href = `/meeting/${meetingId}?session=${fallbackSession}&name=${encodeURIComponent(displayName.trim())}${hostFlag}${videoFlag}${audioFlag}`;
     } finally {
       setBusy(false);
     }

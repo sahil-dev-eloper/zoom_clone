@@ -133,6 +133,8 @@ def schedule(
             status_code=422,
             detail="Scheduled time must be in the future.",
         )
+    host_name = current_user.display_name if current_user else HOST_NAME
+    user_id = current_user.id if current_user else None
     created = create_meeting(
         db,
         title=payload.title,
@@ -141,15 +143,11 @@ def schedule(
         duration=payload.duration_minutes,
         base_url=_base_url(request),
         is_seed=False,
+        user_id=user_id,
+        host_name=host_name,
     )
     obj = db.scalar(select(Meeting).where(Meeting.meeting_id == created["meeting_id"]))
     if obj:
-        if current_user:
-            obj.host_name = current_user.display_name
-            obj.user_id = current_user.id
-        obj.is_seed = False
-        db.commit()
-        db.refresh(obj)
         return _output(obj, request)
     return MeetingOut(**created)
 
@@ -370,22 +368,40 @@ def join(
         )
     )
 
+    # Check if this participant is the meeting creator / owner:
+    # - current_user matches meeting.user_id
+    # - OR current_user display_name matches meeting.host_name (case-insensitive)
+    # - OR joiner display_name matches meeting.host_name (case-insensitive)
+    is_meeting_owner = False
+    if current_user and meeting.user_id and meeting.user_id == current_user.id:
+        is_meeting_owner = True
+    elif current_user and meeting.host_name and current_user.display_name.strip().lower() == meeting.host_name.strip().lower():
+        is_meeting_owner = True
+    elif meeting.host_name and display_name_to_use.strip().lower() == meeting.host_name.strip().lower():
+        # Joined with the host's name
+        if not active_host or active_host.session_id == session_id:
+            is_meeting_owner = True
+
     # Determine whether this participant is the host:
-    # 1. If payload explicitly asks is_host=False, never host.
-    # 2. If current_user matches meeting creator (user_id): host!
-    # 3. If payload explicitly asks is_host=True, then host.
+    # 1. If this participant is the meeting creator/owner, they are ALWAYS the host unconditionally!
+    # 2. If payload explicitly asks is_host=True (e.g. host start action), grant host if available.
+    # 3. If payload explicitly asks is_host=False, non-owner is participant.
     # 4. If an active host already exists with a different session_id, newcomer is not host.
-    # 5. Otherwise, only host if no active host exists in room and display_name matches meeting.host_name.
-    if payload.is_host is False:
-        determined_is_host = False
-    elif current_user and meeting.user_id and meeting.user_id == current_user.id:
+    # 5. Otherwise, host if display_name matches host_name and no other active host exists.
+    if is_meeting_owner:
         determined_is_host = True
     elif payload.is_host is True:
-        determined_is_host = True
+        determined_is_host = (not active_host or active_host.session_id == session_id)
+    elif payload.is_host is False:
+        determined_is_host = False
     elif active_host and active_host.session_id != session_id:
         determined_is_host = False
     else:
-        determined_is_host = (not active_host and display_name_to_use == meeting.host_name)
+        name_matches_host = bool(
+            meeting.host_name and
+            display_name_to_use.strip().lower() == meeting.host_name.strip().lower()
+        )
+        determined_is_host = (not active_host or active_host.session_id == session_id) and name_matches_host
 
     # Link meeting to current_user if host created it without auth initially
     if current_user and not meeting.user_id and determined_is_host:

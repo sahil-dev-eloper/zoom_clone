@@ -24,7 +24,7 @@ import {
   MoreHorizontal,
 } from 'lucide-react';
 
-import { api, formatInviteUrl, getApiBaseUrl, getWsBaseUrl } from '@/lib/api';
+import { api, formatInviteUrl, getApiBaseUrl, getWsBaseUrl, isHostedMeetingId } from '@/lib/api';
 import type { Meeting, Participant, AuthUser } from '@/types';
 import { getStoredUser } from '@/lib/auth';
 import { Brand } from '@/components/Brand';
@@ -959,17 +959,26 @@ export default function MeetingRoomPage({
     setJoining(true);
     setJoinError('');
 
+    const isHostedLocal = isHostedMeetingId(meetingId);
+    const matchesHostName = Boolean(
+      meeting?.host_name &&
+      ((activeStored?.display_name && activeStored.display_name.trim().toLowerCase() === meeting.host_name.trim().toLowerCase()) ||
+       (nameToUse.trim().toLowerCase() === meeting.host_name.trim().toLowerCase()))
+    );
+    const userIsHost = Boolean(initialHost || isHostedLocal || matchesHostName);
+
     try {
       const res = await api.join({
         meeting_id: meetingId,
         display_name: nameToUse,
-        is_host: initialHost,
+        is_host: userIsHost ? true : undefined,
       });
       setSessionId(res.session_id);
       setDisplayName(nameToUse);
-      setIsHost(res.is_host);
+      const finalIsHost = Boolean(res.is_host || userIsHost);
+      setIsHost(finalIsHost);
       setMeeting(res.meeting);
-      const newUrl = `/meeting/${meetingId}?session=${res.session_id}&name=${encodeURIComponent(nameToUse)}${res.is_host ? '&host=true' : ''}`;
+      const newUrl = `/meeting/${meetingId}?session=${res.session_id}&name=${encodeURIComponent(nameToUse)}${finalIsHost ? '&host=true' : ''}`;
       window.history.replaceState(null, '', newUrl);
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
@@ -999,7 +1008,7 @@ export default function MeetingRoomPage({
         const mockSession = 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
         setSessionId(mockSession);
         setDisplayName(nameToUse);
-        const isHostFallback = initialHost;
+        const isHostFallback = userIsHost;
         setIsHost(isHostFallback);
         const newUrl = `/meeting/${meetingId}?session=${mockSession}&name=${encodeURIComponent(nameToUse)}${isHostFallback ? '&host=true' : ''}`;
         window.history.replaceState(null, '', newUrl);
@@ -1010,7 +1019,7 @@ export default function MeetingRoomPage({
       setJoining(false);
     }
 
-  }, [joinPromptName, displayName, meetingId, initialHost]);
+  }, [joinPromptName, displayName, meetingId, initialHost, meeting]);
 
   // Auto-join meeting:
   // - If queryName is provided -> auto-join

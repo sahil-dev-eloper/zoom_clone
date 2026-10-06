@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { api, formatInviteUrl } from '@/lib/api';
+import { api, formatInviteUrl, isHostedMeetingId } from '@/lib/api';
 import { getStoredUser, useAuth } from '@/lib/auth';
 import type { Meeting } from '@/types';
 import { isSeedMeeting } from '@/types';
@@ -141,13 +141,19 @@ export default function ZoomWorkplaceDashboard() {
     }
 
     const curUser = getStoredUser();
-    const hostName = curUser?.display_name || 'Sahil Dargar';
+    const hostName = curUser?.display_name || found?.host_name || 'Sahil Dargar';
+    const isOwner = Boolean(
+      isHostedMeetingId(cleanId) ||
+      (found?.host_name && curUser?.display_name && found.host_name.trim().toLowerCase() === curUser.display_name.trim().toLowerCase())
+    );
     try {
       const joined = await api.join({
         meeting_id: cleanId,
         display_name: hostName,
+        is_host: isOwner ? true : undefined,
       });
-      window.location.href = `/meeting/${cleanId}?session=${joined.session_id}&name=${encodeURIComponent(hostName)}&host=${joined.is_host}`;
+      const finalIsHost = Boolean(joined.is_host || isOwner);
+      window.location.href = `/meeting/${cleanId}?session=${joined.session_id}&name=${encodeURIComponent(hostName)}${finalIsHost ? '&host=true' : ''}`;
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Could not join meeting';
       if (msg.toLowerCase().includes('ended')) {
@@ -219,9 +225,19 @@ export default function ZoomWorkplaceDashboard() {
               upcomingMeetings={upcoming}
               recentMeetings={recent}
               onCopyMeeting={handleCopyMeeting}
+              onStartMeeting={handleStartMeetingById}
               onJoinMeeting={(m) => {
-                setJoinDefaultId(m.meeting_id);
-                setJoinModalOpen(true);
+                const curUser = getStoredUser();
+                const isOwner = Boolean(
+                  isHostedMeetingId(m.meeting_id) ||
+                  (m.host_name && curUser?.display_name && m.host_name.trim().toLowerCase() === curUser.display_name.trim().toLowerCase())
+                );
+                if (isOwner) {
+                  handleStartMeetingById(m.meeting_id);
+                } else {
+                  setJoinDefaultId(m.meeting_id);
+                  setJoinModalOpen(true);
+                }
               }}
             />
           )}

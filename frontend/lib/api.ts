@@ -139,6 +139,31 @@ export function getRecentMeetingIds(): string[] {
   }
 }
 
+export function saveHostedMeetingId(meetingId: string) {
+  if (typeof window === 'undefined' || !meetingId) return;
+  try {
+    const cleanId = meetingId.replace(/\s+/g, '');
+    const raw = localStorage.getItem('zoom_hosted_meeting_ids') || '[]';
+    const list: string[] = JSON.parse(raw);
+    if (!list.includes(cleanId)) {
+      list.unshift(cleanId);
+      localStorage.setItem('zoom_hosted_meeting_ids', JSON.stringify(list.slice(0, 50)));
+    }
+  } catch {}
+}
+
+export function isHostedMeetingId(meetingId: string): boolean {
+  if (typeof window === 'undefined' || !meetingId) return false;
+  try {
+    const cleanId = meetingId.replace(/\s+/g, '');
+    const raw = localStorage.getItem('zoom_hosted_meeting_ids') || '[]';
+    const list: string[] = JSON.parse(raw);
+    return list.includes(cleanId);
+  } catch {
+    return false;
+  }
+}
+
 export const api = {
   // ---- Dashboard ----
   upcoming: async () => {
@@ -157,6 +182,7 @@ export const api = {
     const m = await request<Meeting>('/api/meetings/instant', { method: 'POST' });
     if (m?.meeting_id) {
       saveRecentMeetingId(m.meeting_id);
+      saveHostedMeetingId(m.meeting_id);
     }
     return sanitizeMeeting(m);
   },
@@ -168,6 +194,7 @@ export const api = {
     });
     if (m?.meeting_id) {
       saveRecentMeetingId(m.meeting_id);
+      saveHostedMeetingId(m.meeting_id);
     }
     return sanitizeMeeting(m);
   },

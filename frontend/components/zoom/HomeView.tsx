@@ -21,6 +21,7 @@ import { ParasolEmptyStateIllustration } from './Illustrations';
 import type { Meeting } from '@/types';
 import { isSeedMeeting } from '@/types';
 import { useAuth } from '@/lib/auth';
+import { isHostedMeetingId } from '@/lib/api';
 
 interface HomeViewProps {
   onStartInstant: () => void;
@@ -33,6 +34,7 @@ interface HomeViewProps {
   recentMeetings?: Meeting[];
   onCopyMeeting: (meeting: Meeting) => void;
   onJoinMeeting: (meeting: Meeting) => void;
+  onStartMeeting?: (meetingId: string) => void;
 }
 
 export function HomeView({
@@ -46,7 +48,9 @@ export function HomeView({
   recentMeetings = [],
   onCopyMeeting,
   onJoinMeeting,
+  onStartMeeting,
 }: HomeViewProps) {
+  const { user } = useAuth();
   // Live Clock & Date
   const [isMounted, setIsMounted] = useState(false);
   const [timeStr, setTimeStr] = useState('');
@@ -368,6 +372,10 @@ export function HomeView({
                   hour: '2-digit',
                   minute: '2-digit',
                 });
+                const isOwner = Boolean(
+                  isHostedMeetingId(m.meeting_id) ||
+                  (user?.display_name && m.host_name && user.display_name.trim().toLowerCase() === m.host_name.trim().toLowerCase())
+                );
                 return (
                   <div key={m.meeting_id} className="zoom-scheduled-item">
                     <div className="zoom-scheduled-time-badge">
@@ -394,11 +402,15 @@ export function HomeView({
                         className="zoom-btn-primary sm"
                         onClick={() => {
                           if (isSeedMeeting(m)) return;
-                          onJoinMeeting(m);
+                          if (isOwner && onStartMeeting) {
+                            onStartMeeting(m.meeting_id);
+                          } else {
+                            onJoinMeeting(m);
+                          }
                         }}
                       >
-                        <LogIn size={13} />
-                        <span>Join</span>
+                        {isOwner ? <Video size={13} /> : <LogIn size={13} />}
+                        <span>{isOwner ? 'Start' : 'Join'}</span>
                       </button>
                     </div>
                   </div>
