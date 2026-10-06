@@ -71,6 +71,12 @@ export default function ZoomWorkplaceDashboard() {
   };
 
   const loadMeetings = useCallback(async () => {
+    if (!isLoggedIn) {
+      setUpcoming([]);
+      setRecent([]);
+      setLoading(false);
+      return;
+    }
     try {
       setError('');
       setLoading(true);
@@ -85,10 +91,16 @@ export default function ZoomWorkplaceDashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isLoggedIn]);
 
   useEffect(() => {
-    loadMeetings();
+    if (!isLoggedIn) {
+      setUpcoming([]);
+      setRecent([]);
+      setLoading(false);
+    } else {
+      loadMeetings();
+    }
   }, [loadMeetings, isLoggedIn, user?.id]);
 
   // Start instant meeting

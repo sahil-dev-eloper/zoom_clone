@@ -74,12 +74,7 @@ export function AuthModal({
     }
   };
 
-  const handleFillDemo = () => {
-    setMode('login');
-    setEmail('sahil@example.com');
-    setPassword('sahil123');
-    setError('');
-  };
+
 
   return (
     <div className="zoom-modal-backdrop" onClick={onClose}>
@@ -344,35 +339,6 @@ export function AuthModal({
             </button>
           </form>
 
-          {/* Quick Demo Login Option */}
-          <div
-            style={{
-              marginTop: 18,
-              paddingTop: 16,
-              borderTop: '1px solid #F1F5F9',
-              textAlign: 'center',
-            }}
-          >
-            <div style={{ fontSize: 12, color: '#64748B', marginBottom: 8 }}>
-              Want to test quickly?
-            </div>
-            <button
-              type="button"
-              onClick={handleFillDemo}
-              style={{
-                background: '#EFF6FF',
-                border: '1px solid #BFDBFE',
-                color: '#0B5CFF',
-                fontSize: 12.5,
-                fontWeight: 600,
-                padding: '6px 14px',
-                borderRadius: 6,
-                cursor: 'pointer',
-              }}
-            >
-              Auto-fill Demo Account (Sahil Dargar)
-            </button>
-          </div>
         </div>
       </div>
     </div>

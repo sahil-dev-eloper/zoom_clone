@@ -5623,13 +5623,34 @@ html, body {
   .zoom-inmeeting-bottom-bar {
     height: 60px;
     padding: 0 4px;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    overflow: visible;           /* Must NOT be hidden/auto — would clip popovers */
     display: flex;
     justify-content: space-around;
     align-items: center;
     position: relative;
     scrollbar-width: none;
+  }
+
+  /* Popovers become fixed bottom sheets on mobile so they can't be clipped */
+  .zoom-inmeeting-popover {
+    position: fixed !important;
+    bottom: 68px !important;     /* sit just above the dock bar */
+    left: 12px !important;
+    right: 12px !important;
+    width: auto !important;
+    min-width: unset !important;
+    max-width: calc(100vw - 24px) !important;
+    border-radius: 14px !important;
+    z-index: 999 !important;
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.8) !important;
+  }
+
+  /* React emoji tray — keep it centred above dock */
+  .zoom-inmeeting-popover.react-tray {
+    left: 50% !important;
+    right: auto !important;
+    width: auto !important;
+    transform: translateX(-50%) !important;
   }
 
   .zoom-inmeeting-bottom-bar::-webkit-scrollbar {

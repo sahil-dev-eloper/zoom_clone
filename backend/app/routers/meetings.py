@@ -161,13 +161,16 @@ def upcoming(
     current_user: User | None = Depends(get_current_user_optional),
 ):
     """
-    Return only future scheduled meetings (not yet started).
-    Once a meeting's scheduled_time passes, it no longer appears here — it moves to recents.
-    Seed demo data (5 entries) is always shown as a baseline.
+    Return future scheduled meetings (not yet started).
+    If the user is not logged in, returns an empty list.
+    When authenticated, returns user's scheduled meetings plus seed demo meetings.
     """
+    if not current_user:
+        return []
+
     now = utcnow()
 
-    # 1. Exactly 5 seed demo upcoming meetings (shown to everyone as baseline demo data)
+    # 1. Exactly 5 seed demo upcoming meetings (shown only after authentication)
     seed_upcoming = (
         db.scalars(
             select(Meeting)
@@ -182,28 +185,26 @@ def upcoming(
         .all()
     )
 
-    # 2. User's own future scheduled meetings (if logged in)
-    user_upcoming: list[Meeting] = []
-    if current_user:
-        participant_meeting_ids = select(Participant.meeting_id).where(
-            Participant.user_id == current_user.id
-        )
-        user_upcoming = (
-            db.scalars(
-                select(Meeting)
-                .where(
-                    (Meeting.is_seed.is_(False) | Meeting.is_seed.is_(None)),
-                    Meeting.status == "scheduled",
-                    Meeting.scheduled_time >= now,
-                    (
-                        (Meeting.user_id == current_user.id)
-                        | Meeting.id.in_(participant_meeting_ids)
-                    ),
-                )
-                .order_by(Meeting.scheduled_time)
+    # 2. User's own future scheduled meetings
+    participant_meeting_ids = select(Participant.meeting_id).where(
+        Participant.user_id == current_user.id
+    )
+    user_upcoming = (
+        db.scalars(
+            select(Meeting)
+            .where(
+                (Meeting.is_seed.is_(False) | Meeting.is_seed.is_(None)),
+                Meeting.status == "scheduled",
+                Meeting.scheduled_time >= now,
+                (
+                    (Meeting.user_id == current_user.id)
+                    | Meeting.id.in_(participant_meeting_ids)
+                ),
             )
-            .all()
+            .order_by(Meeting.scheduled_time)
         )
+        .all()
+    )
 
     # User's own meetings first, followed by seed demo meetings
     combined = list(user_upcoming) + list(seed_upcoming)
@@ -218,16 +219,16 @@ def recent(
     current_user: User | None = Depends(get_current_user_optional),
 ):
     """
-    Return recent meetings for the logged-in user (both host and participants),
-    plus the 5 seed demo history meetings.
-    Includes:
-    - Active meetings (host hasn't ended → can rejoin)
-    - Ended meetings (past history)
-    - Past-due scheduled meetings (scheduled_time passed but never started)
+    Return recent meetings for the logged-in user.
+    If the user is not logged in, returns an empty list.
+    When authenticated, returns user's meetings plus the 5 seed demo history meetings.
     """
+    if not current_user:
+        return []
+
     now = utcnow()
 
-    # 1. 5 Seed demo meetings (ended past history records)
+    # 1. 5 Seed demo meetings (ended past history records, shown only after authentication)
     seed_recent = (
         db.scalars(
             select(Meeting)

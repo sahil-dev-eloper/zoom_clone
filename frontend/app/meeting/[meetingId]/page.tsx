@@ -19,8 +19,6 @@ import {
   LogIn,
   Check,
   ShieldCheck,
-  Sparkles,
-  LayoutGrid,
   ChevronUp,
   X,
   MoreHorizontal,
@@ -114,7 +112,6 @@ export default function MeetingRoomPage({
   const [endConfirmOpen, setEndConfirmOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [panelType, setPanelType] = useState<'participants' | null>(null);
-  const [viewMode, setViewMode] = useState<'speaker' | 'gallery'>('speaker');
   const [floatingReactions, setFloatingReactions] = useState<{ id: string; emoji: string; left: number }[]>([]);
 
   // Meeting State
@@ -131,6 +128,19 @@ export default function MeetingRoomPage({
   const [kicked, setKicked] = useState(false);
   const [hasLoadedInitialParticipants, setHasLoadedInitialParticipants] = useState(false);
   const [muteNotice, setMuteNotice] = useState('');
+
+  // Preserve original meeting title and host name across all renders
+  const meetingTitle =
+    meeting?.title ||
+    (meeting?.host_name ? `${meeting.host_name}'s Meeting` : 'Zoom Meeting');
+  const meetingHost = meeting?.host_name || (isHost ? displayName : 'Host');
+
+  // Update browser document tab title unconditionally at top-level
+  useEffect(() => {
+    if (meetingTitle && typeof document !== 'undefined') {
+      document.title = `${meetingTitle} — Zoom`;
+    }
+  }, [meetingTitle]);
 
   // Voice Activity & Audio Meter State
   const [localSpeaking, setLocalSpeaking] = useState(false);
@@ -347,8 +357,8 @@ export default function MeetingRoomPage({
       const fallbackMeeting: Meeting = {
         meeting_id: meetingId,
         invite_token: 'zoom_' + meetingId.slice(0, 6),
-        title: `${displayName || 'Sahil Dargar'}'s Zoom Meeting`,
-        host_name: 'Sahil Dargar',
+        title: 'Zoom Meeting',
+        host_name: 'Host',
         scheduled_time: new Date().toISOString(),
         duration_minutes: 60,
         status: 'active',
@@ -358,7 +368,7 @@ export default function MeetingRoomPage({
       };
       setMeeting(fallbackMeeting);
     }
-  }, [meetingId, displayName]);
+  }, [meetingId]);
 
   // ---- Load participants & detect kicked ----
 
@@ -1791,41 +1801,11 @@ export default function MeetingRoomPage({
                 </div>
               </button>
               <span className="zoom-inmeeting-title">
-                {displayName}&apos;s Zoom Meeting
+                {meetingTitle}
               </span>
             </div>
 
-            {/* Right: Security Check, AI Sparkle, View Layout, User Avatar */}
-            <div className="zoom-inmeeting-right">
-              <button
-                className="zoom-inmeeting-icon-btn"
-                title="Verified End-to-End Encryption"
-                style={{ color: '#22c55e' }}
-              >
-                <ShieldCheck size={18} />
-              </button>
 
-              <button
-                className="zoom-inmeeting-icon-btn"
-                title="Zoom AI Companion is active"
-                style={{ color: '#38bdf8' }}
-                onClick={() => alert('Zoom AI Companion is active and ready.')}
-              >
-                <Sparkles size={18} />
-              </button>
-
-              <button
-                className="zoom-inmeeting-icon-btn"
-                title="View Layout"
-                onClick={() => setViewMode(viewMode === 'speaker' ? 'gallery' : 'speaker')}
-              >
-                <LayoutGrid size={18} />
-              </button>
-
-              <div className="zoom-inmeeting-avatar" title={displayName || 'Sahil Dargar'}>
-                <span style={{ fontSize: 11, fontWeight: 700 }}>{getInitial(displayName || 'SD')}</span>
-              </div>
-            </div>
           </div>
 
           {/* Meeting Info Popup (when green info shield is clicked) */}
@@ -1834,19 +1814,19 @@ export default function MeetingRoomPage({
               <h4>Meeting Information</h4>
               <div className="zoom-info-row">
                 <label>Meeting Topic</label>
-                <span>{displayName}&apos;s Zoom Meeting</span>
+                <span>{meetingTitle}</span>
               </div>
               <div className="zoom-info-row">
                 <label>Meeting ID</label>
-                <span>{meeting.meeting_id}</span>
+                <span>{meeting?.meeting_id || meetingId}</span>
               </div>
               <div className="zoom-info-row">
                 <label>Host</label>
-                <span>{displayName}</span>
+                <span>{meetingHost}</span>
               </div>
               <div className="zoom-info-row">
                 <label>Passcode</label>
-                <span>{meeting.passcode || 'Protected'}</span>
+                <span>{meeting?.passcode || meeting?.invite_token || 'Protected'}</span>
               </div>
               <div className="zoom-info-row">
                 <label>Invite Link</label>
