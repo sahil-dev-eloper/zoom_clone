@@ -12,8 +12,22 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 load_dotenv()
 
-_default_db = f"sqlite:///{Path(__file__).resolve().parents[1] / 'zoom_clone.db'}"
+_backend_dir = Path(__file__).resolve().parents[1]
+_default_db = f"sqlite:///{(_backend_dir / 'zoom_clone.db').as_posix()}"
 DATABASE_URL = os.getenv("DATABASE_URL", _default_db)
+
+if DATABASE_URL.startswith("sqlite:///"):
+    path_str = DATABASE_URL[len("sqlite:///"):]
+    # If zoom.db is referenced, align with zoom_clone.db
+    if path_str.endswith("zoom.db"):
+        path_str = path_str[:-7] + "zoom_clone.db"
+
+    # Check if path is relative (Windows drive letter or leading slash)
+    is_absolute = (len(path_str) > 2 and path_str[1] == ":") or path_str.startswith("/")
+    if not is_absolute:
+        clean_rel = path_str.lstrip("./").lstrip(".\\")
+        abs_file = (_backend_dir / clean_rel).resolve()
+        DATABASE_URL = f"sqlite:///{abs_file.as_posix()}"
 
 engine = create_engine(
     DATABASE_URL,

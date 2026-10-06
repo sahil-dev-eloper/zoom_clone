@@ -75,6 +75,7 @@ class Participant(Base):
     )
     display_name: Mapped[str] = mapped_column(String(100))
     is_host: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_muted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=True)
     joined_at: Mapped[datetime] = mapped_column(DateTime)
     left_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     session_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)

@@ -19,9 +19,22 @@ import type {
 export function getApiBaseUrl(): string {
   const envUrl = process.env.NEXT_PUBLIC_API_URL;
   if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
     const isLocalhost =
-      window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1';
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1';
+
+    // Support local multi-device testing over LAN (e.g. 192.168.x.x, 10.x.x.x)
+    const isLanIp =
+      /^192\.168\./.test(hostname) ||
+      /^10\./.test(hostname) ||
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname) ||
+      hostname.endsWith('.local');
+
+    if (isLanIp) {
+      return `http://${hostname}:8000`;
+    }
+
     if (!isLocalhost) {
       if (!envUrl || envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) {
         return 'https://zoomclonebe.onrender.com';

@@ -53,6 +53,11 @@ def check_and_migrate_db():
             conn.commit()
         except Exception:
             pass
+        try:
+            conn.execute(text("ALTER TABLE participants ADD COLUMN is_muted BOOLEAN DEFAULT 0"))
+            conn.commit()
+        except Exception:
+            pass
 
 
 def seed_demo_user(db):
