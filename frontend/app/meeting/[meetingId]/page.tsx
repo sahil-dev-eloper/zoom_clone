@@ -24,7 +24,6 @@ import {
   ChevronUp,
   X,
   MoreHorizontal,
-  Heart,
 } from 'lucide-react';
 
 import { api, formatInviteUrl, getApiBaseUrl, getWsBaseUrl } from '@/lib/api';
@@ -110,7 +109,6 @@ export default function MeetingRoomPage({
   const [infoPopupOpen, setInfoPopupOpen] = useState(false);
   const [audioMenuOpen, setAudioMenuOpen] = useState(false);
   const [videoMenuOpen, setVideoMenuOpen] = useState(false);
-  const [reactMenuOpen, setReactMenuOpen] = useState(false);
   const [hostMenuOpen, setHostMenuOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [endConfirmOpen, setEndConfirmOpen] = useState(false);
@@ -234,28 +232,77 @@ export default function MeetingRoomPage({
     };
   }, [handleUserGesture]);
 
-  // Keep remote video and audio elements active and bound to streams
+  // Dedicated callback refs to guarantee DOM elements are instantly bound to media streams
+  const attachLocalVideo = useCallback((el: HTMLVideoElement | null) => {
+    videoRef.current = el;
+    if (el && videoStreamRef.current) {
+      if (el.srcObject !== videoStreamRef.current) {
+        el.srcObject = videoStreamRef.current;
+      }
+      el.play().catch(() => {});
+    }
+  }, []);
+
+  const attachRemoteVideo = useCallback((peerId: string, el: HTMLVideoElement | null) => {
+    if (el) {
+      remoteVideoRefs.current.set(peerId, el);
+      const stream = remoteMediaStreamsRef.current[peerId] || remoteStreams[peerId];
+      if (stream && el.srcObject !== stream) {
+        el.srcObject = stream;
+        el.play().catch(() => {});
+      }
+    } else {
+      remoteVideoRefs.current.delete(peerId);
+    }
+  }, [remoteStreams]);
+
+  const attachRemoteAudio = useCallback((peerId: string, el: HTMLAudioElement | null) => {
+    if (el) {
+      remoteAudioRefs.current.set(peerId, el);
+      const stream = remoteMediaStreamsRef.current[peerId] || remoteStreams[peerId];
+      if (stream && el.srcObject !== stream) {
+        el.srcObject = stream;
+        el.play().catch((err) => {
+          console.warn('Autoplay prevented on audio for', peerId, err);
+          setAudioBlocked(true);
+        });
+      }
+    } else {
+      remoteAudioRefs.current.delete(peerId);
+    }
+  }, [remoteStreams]);
+
+  // Keep local & remote video and audio elements active and bound to streams
   useEffect(() => {
-    Object.entries(remoteStreams).forEach(([peerId, stream]) => {
-      const vEl = remoteVideoRefs.current.get(peerId);
-      if (vEl && stream) {
-        if (vEl.srcObject !== stream) {
-          vEl.srcObject = stream;
-        }
+    // 1. Sync local video
+    if (videoRef.current && videoStreamRef.current && cameraOn) {
+      if (videoRef.current.srcObject !== videoStreamRef.current) {
+        videoRef.current.srcObject = videoStreamRef.current;
+      }
+      videoRef.current.play().catch(() => {});
+    }
+
+    // 2. Sync all remote videos
+    remoteVideoRefs.current.forEach((vEl, peerId) => {
+      const stream = remoteMediaStreamsRef.current[peerId] || remoteStreams[peerId];
+      if (vEl && stream && vEl.srcObject !== stream) {
+        vEl.srcObject = stream;
         vEl.play().catch(() => {});
       }
-      const aEl = remoteAudioRefs.current.get(peerId);
-      if (aEl && stream) {
-        if (aEl.srcObject !== stream) {
-          aEl.srcObject = stream;
-        }
+    });
+
+    // 3. Sync all remote audios
+    remoteAudioRefs.current.forEach((aEl, peerId) => {
+      const stream = remoteMediaStreamsRef.current[peerId] || remoteStreams[peerId];
+      if (aEl && stream && aEl.srcObject !== stream) {
+        aEl.srcObject = stream;
         aEl.play().catch((err) => {
           console.warn('Audio play prevented:', err);
           setAudioBlocked(true);
         });
       }
     });
-  }, [remoteStreams, streamVersion, peerMediaState]);
+  }, [remoteStreams, streamVersion, cameraOn, peerMediaState]);
 
   // ---- Attach Analyser for Remote Stream ----
 
@@ -438,26 +485,34 @@ export default function MeetingRoomPage({
     peerConnectionsRef.current.set(targetPeerId, pc);
 
     // Audio: attach active track or create sendrecv transceiver
+    let aSender: RTCRtpSender | null = null;
     if (audioStreamRef.current && audioStreamRef.current.getAudioTracks().length > 0) {
       const aTrack = audioStreamRef.current.getAudioTracks()[0];
       if (aTrack && aTrack.readyState === 'live') {
-        pc.addTrack(aTrack, audioStreamRef.current);
-      } else {
-        pc.addTransceiver('audio', { direction: 'sendrecv' });
+        try {
+          aSender = pc.addTrack(aTrack, audioStreamRef.current);
+        } catch {
+          // ignore
+        }
       }
-    } else {
+    }
+    if (!aSender && !getMediaSender(pc, 'audio')) {
       pc.addTransceiver('audio', { direction: 'sendrecv' });
     }
 
     // Video: attach active track or create sendrecv transceiver
+    let vSender: RTCRtpSender | null = null;
     if (videoStreamRef.current && videoStreamRef.current.getVideoTracks().length > 0) {
       const vTrack = videoStreamRef.current.getVideoTracks()[0];
       if (vTrack && vTrack.readyState === 'live') {
-        pc.addTrack(vTrack, videoStreamRef.current);
-      } else {
-        pc.addTransceiver('video', { direction: 'sendrecv' });
+        try {
+          vSender = pc.addTrack(vTrack, videoStreamRef.current);
+        } catch {
+          // ignore
+        }
       }
-    } else {
+    }
+    if (!vSender && !getMediaSender(pc, 'video')) {
       pc.addTransceiver('video', { direction: 'sendrecv' });
     }
 
@@ -493,7 +548,10 @@ export default function MeetingRoomPage({
         stream.addTrack(track);
       }
 
-      setRemoteStreams({ ...remoteMediaStreamsRef.current });
+      setRemoteStreams((prev) => ({
+        ...prev,
+        [targetPeerId]: stream,
+      }));
       setStreamVersion((v) => v + 1);
 
       // Immediately bind to any existing mounted video and audio elements
@@ -658,17 +716,32 @@ export default function MeetingRoomPage({
             if (!pc || pc.signalingState === 'closed') {
               pc = createPeerConnectionRef.current(msg.peerId, false);
             }
+
+            // Perfect negotiation: gracefully handle glare / offer collision
+            const isPolite = (sessionIdRef.current || '').localeCompare(msg.peerId) > 0;
+            const offerCollision = pc.signalingState !== 'stable';
+            if (offerCollision) {
+              if (!isPolite) {
+                console.log(`[Zooom WebRTC] Impolite peer ignoring offer collision from ${msg.peerId}`);
+                return;
+              }
+              console.log(`[Zooom WebRTC] Polite peer rolling back for offer from ${msg.peerId}`);
+              await pc.setRemoteDescription({ type: 'rollback' }).catch(console.warn);
+            }
+
             console.log(`[Zooom WebRTC] Setting remote description (offer) from ${msg.peerId}`);
             await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
 
             // Attach active local tracks to matched transceivers/senders
+            const curVTrack = videoStreamRef.current?.getVideoTracks()[0];
             const vSender = getMediaSender(pc, 'video');
-            if (vSender && videoStreamRef.current?.getVideoTracks()[0]) {
-              await vSender.replaceTrack(videoStreamRef.current.getVideoTracks()[0]).catch(console.warn);
+            if (vSender && curVTrack && curVTrack.readyState === 'live') {
+              await vSender.replaceTrack(curVTrack).catch(console.warn);
             }
+            const curATrack = audioStreamRef.current?.getAudioTracks()[0];
             const aSender = getMediaSender(pc, 'audio');
-            if (aSender && audioStreamRef.current?.getAudioTracks()[0]) {
-              await aSender.replaceTrack(audioStreamRef.current.getAudioTracks()[0]).catch(console.warn);
+            if (aSender && curATrack && curATrack.readyState === 'live') {
+              await aSender.replaceTrack(curATrack).catch(console.warn);
             }
 
             // Flush pending ICE candidates
@@ -688,7 +761,7 @@ export default function MeetingRoomPage({
               wsRef.current.send(
                 JSON.stringify({
                   type: 'answer',
-                  peerId: sessionId,
+                  peerId: sessionIdRef.current,
                   targetPeerId: msg.peerId,
                   sdp: pc.localDescription,
                 })
@@ -951,7 +1024,6 @@ export default function MeetingRoomPage({
         })
       );
     }
-    setReactMenuOpen(false);
   };
 
   // ---- Auto-initialize camera & mic upon entering meeting room ----
@@ -1019,9 +1091,9 @@ export default function MeetingRoomPage({
           wsRef.current.send(
             JSON.stringify({
               type: 'media-state',
-              peerId: sessionId,
-              video: true,
-              audio: true,
+              peerId: sessionIdRef.current,
+              video: false,
+              audio: false,
             })
           );
         }
@@ -1058,7 +1130,7 @@ export default function MeetingRoomPage({
         wsRef.current.send(
           JSON.stringify({
             type: 'media-state',
-            peerId: sessionId,
+            peerId: sessionIdRef.current,
             video: false,
             audio: !muted,
           })
@@ -1096,7 +1168,7 @@ export default function MeetingRoomPage({
           wsRef.current.send(
             JSON.stringify({
               type: 'media-state',
-              peerId: sessionId,
+              peerId: sessionIdRef.current,
               video: true,
               audio: !muted,
             })
@@ -1112,7 +1184,7 @@ export default function MeetingRoomPage({
 
   const toggleMic = async () => {
     if (!muted) {
-      // Mute microphone
+      // Mute microphone: disable track to send silence while keeping WebRTC audio pipeline alive
       if (audioStreamRef.current) {
         audioStreamRef.current.getAudioTracks().forEach((t) => {
           t.enabled = false;
@@ -1122,18 +1194,11 @@ export default function MeetingRoomPage({
       setLocalSpeaking(false);
       setLocalVolume(0);
 
-      peerConnectionsRef.current.forEach((pc) => {
-        const aSender = getMediaSender(pc, 'audio');
-        if (aSender) {
-          aSender.replaceTrack(null).catch(console.warn);
-        }
-      });
-
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(
           JSON.stringify({
             type: 'media-state',
-            peerId: sessionId,
+            peerId: sessionIdRef.current,
             video: cameraOn,
             audio: false,
           })
@@ -1141,7 +1206,7 @@ export default function MeetingRoomPage({
         wsRef.current.send(
           JSON.stringify({
             type: 'speaking',
-            peerId: sessionId,
+            peerId: sessionIdRef.current,
             speaking: false,
           })
         );
@@ -1210,7 +1275,7 @@ export default function MeetingRoomPage({
           wsRef.current.send(
             JSON.stringify({
               type: 'media-state',
-              peerId: sessionId,
+              peerId: sessionIdRef.current,
               video: cameraOn,
               audio: true,
             })
@@ -1452,7 +1517,10 @@ export default function MeetingRoomPage({
 
   // ---- Host: mute all participants ----
   const handleMuteAll = useCallback(() => {
-    if (!isHost) return;
+    if (!isHost) {
+      alert('Only the meeting host can mute all participants.');
+      return;
+    }
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(
         JSON.stringify({
@@ -1891,7 +1959,7 @@ export default function MeetingRoomPage({
                       />
                     ) : cameraOn ? (
                       <video
-                        ref={videoRef}
+                        ref={attachLocalVideo}
                         autoPlay
                         playsInline
                         muted
@@ -1914,11 +1982,11 @@ export default function MeetingRoomPage({
 
                   {/* Remote Participant Tiles */}
                   {otherPeople.map((p) => {
-                    const remoteStream = remoteStreams[p.session_id];
+                    const remoteStream = remoteMediaStreamsRef.current[p.session_id] || remoteStreams[p.session_id];
                     const hasLiveVideoTrack = Boolean(
                       remoteStream &&
                         remoteStream.getVideoTracks().some(
-                          (t) => t.enabled && !t.muted && t.readyState === 'live'
+                          (t) => t.enabled && t.readyState === 'live'
                         )
                     );
                     const hasPeerVideoState = peerMediaState[p.session_id]?.video ?? false;
@@ -1931,24 +1999,14 @@ export default function MeetingRoomPage({
                         key={p.session_id}
                         className={`zoom-video-tile ${isSpeaking ? 'speaking' : ''}`}
                       >
-                        {hasVideo ? (
-                          <video
-                            autoPlay
-                            playsInline
-                            ref={(el) => {
-                              if (el) {
-                                remoteVideoRefs.current.set(p.session_id, el);
-                                if (remoteStream && el.srcObject !== remoteStream) {
-                                  el.srcObject = remoteStream;
-                                  el.play().catch(() => {});
-                                }
-                              } else {
-                                remoteVideoRefs.current.delete(p.session_id);
-                              }
-                            }}
-                            className="zoom-tile-video"
-                          />
-                        ) : (
+                        <video
+                          autoPlay
+                          playsInline
+                          ref={(el) => attachRemoteVideo(p.session_id, el)}
+                          className="zoom-tile-video"
+                          style={{ display: hasVideo ? 'block' : 'none' }}
+                        />
+                        {!hasVideo && (
                           <div className="zoom-tile-avatar">
                             <div className="zoom-tile-avatar-card">
                               <span className="zoom-tile-initials">{getInitial(p.display_name)}</span>
@@ -1969,7 +2027,7 @@ export default function MeetingRoomPage({
                 <>
                   {/* Live Camera Video (when camera is ON and solo) */}
                   <video
-                    ref={videoRef}
+                    ref={attachLocalVideo}
                     muted
                     playsInline
                     autoPlay
@@ -1999,27 +2057,13 @@ export default function MeetingRoomPage({
               )}
 
               {/* Background Audio playback for all remote participants */}
-              <div style={{ display: 'none' }}>
+              <div style={{ position: 'fixed', left: -9999, top: -9999, width: 1, height: 1, opacity: 0, pointerEvents: 'none' }}>
                 {otherPeople.map((p) => (
                   <audio
                     key={`remote-audio-${p.session_id}`}
                     autoPlay
                     playsInline
-                    ref={(el) => {
-                      if (el) {
-                        remoteAudioRefs.current.set(p.session_id, el);
-                        const stream = remoteStreams[p.session_id];
-                        if (stream && el.srcObject !== stream) {
-                          el.srcObject = stream;
-                          el.play().catch((err) => {
-                            console.warn('Autoplay prevented on audio:', err);
-                            setAudioBlocked(true);
-                          });
-                        }
-                      } else {
-                        remoteAudioRefs.current.delete(p.session_id);
-                      }
-                    }}
+                    ref={(el) => attachRemoteAudio(p.session_id, el)}
                   />
                 ))}
               </div>
@@ -2113,28 +2157,6 @@ export default function MeetingRoomPage({
                       </div>
                     );
                   })}
-                </div>
-
-                <div className="zoom-sidepanel-foot">
-                  {isHost && (
-                    <button
-                      type="button"
-                      className="zoom-mute-all-btn"
-                      onClick={handleMuteAll}
-                      title="Mute all participants"
-                    >
-                      <MicOff size={14} />
-                      <span>Mute All</span>
-                    </button>
-                  )}
-                  <button
-                    className="zoom-copy-link-btn"
-                    style={{ width: '100%', justifyContent: 'center' }}
-                    onClick={copyInvite}
-                  >
-                    {copied ? <Check size={13} color="#22c55e" /> : <Copy size={13} />}
-                    {copied ? 'Invite Copied!' : 'Copy Invite Link'}
-                  </button>
                 </div>
               </aside>
             )}
@@ -2266,35 +2288,6 @@ export default function MeetingRoomPage({
               </button>
 
 
-              {/* React */}
-              <div style={{ position: 'relative' }}>
-                <button
-                  className={`zoom-dock-btn ${reactMenuOpen ? 'active' : ''}`}
-                  onClick={() => setReactMenuOpen(!reactMenuOpen)}
-                  title="Reactions"
-                >
-                  <div className="zoom-dock-icon-box">
-                    <Heart size={20} />
-                  </div>
-                  <span className="zoom-dock-label">React</span>
-                </button>
-
-                {reactMenuOpen && (
-                  <div className="zoom-inmeeting-popover react-tray">
-                    {['👏', '👍', '❤️', '😂', '😮', '🎉', '✋'].map((emoji) => (
-                      <button
-                        key={emoji}
-                        className="zoom-react-emoji-btn"
-                        onClick={() => sendReaction(emoji)}
-                        title={emoji}
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
               {/* Share */}
               <button
                 className={`zoom-dock-btn ${screenSharing ? 'active' : ''}`}
@@ -2312,38 +2305,44 @@ export default function MeetingRoomPage({
                 </span>
               </button>
 
-              {/* Host tools */}
+              {/* Host Controls */}
               <div style={{ position: 'relative' }}>
                 <button
                   className={`zoom-dock-btn ${hostMenuOpen ? 'active' : ''}`}
                   onClick={() => setHostMenuOpen(!hostMenuOpen)}
-                  title="Host Security & Tools"
+                  title="Host Controls"
                 >
                   <div className="zoom-dock-icon-box">
                     <ShieldCheck size={20} />
                   </div>
                   <span className="zoom-dock-label">
-                    Host tools
+                    Host controls
                     <span className="zoom-caret-mini">^</span>
                   </span>
                 </button>
 
                 {hostMenuOpen && (
-                  <div className="zoom-inmeeting-popover" style={{ minWidth: 240 }}>
-                    <div className="zoom-popover-header">Security Controls</div>
-                    <div className="zoom-popover-item" onClick={() => setHostMenuOpen(false)}>
-                      <Check size={14} color="#22c55e" /> Lock Meeting
+                  <div className="zoom-inmeeting-popover" style={{ minWidth: 230 }}>
+                    <div className="zoom-popover-header">Host Controls</div>
+                    <div
+                      className="zoom-popover-item"
+                      onClick={() => {
+                        setHostMenuOpen(false);
+                        handleMuteAll();
+                      }}
+                      style={{ color: '#EF4444' }}
+                    >
+                      <MicOff size={15} color="#EF4444" />
+                      <span style={{ fontWeight: 600 }}>Mute All</span>
                     </div>
-                    <div className="zoom-popover-item" onClick={() => setHostMenuOpen(false)}>
-                      <Check size={14} color="#22c55e" /> Enable Waiting Room
-                    </div>
-                    <div className="zoom-popover-divider" />
-                    <div className="zoom-popover-header">Allow Participants To:</div>
-                    <div className="zoom-popover-item" onClick={() => setHostMenuOpen(false)}>
-                      <Check size={14} color="#22c55e" /> Share Screen
-                    </div>
-                    <div className="zoom-popover-item" onClick={() => setHostMenuOpen(false)}>
-                      <Check size={14} color="#22c55e" /> Unmute Themselves
+                    <div
+                      className="zoom-popover-item"
+                      onClick={() => {
+                        copyInvite();
+                      }}
+                    >
+                      {copied ? <Check size={15} color="#22C55E" /> : <Copy size={15} />}
+                      <span>{copied ? 'Link Copied!' : 'Share the link'}</span>
                     </div>
                   </div>
                 )}
@@ -2366,13 +2365,6 @@ export default function MeetingRoomPage({
                   <div className="zoom-inmeeting-popover">
                     <div className="zoom-popover-item" onClick={() => { setMoreMenuOpen(false); copyInvite(); }}>
                       <Copy size={14} /> Copy Invitation
-                    </div>
-                    <div className="zoom-popover-item" onClick={() => { setMoreMenuOpen(false); alert('Meeting recording has started.'); }}>
-                      <Monitor size={14} /> Record to this Computer
-                    </div>
-                    <div className="zoom-popover-divider" />
-                    <div className="zoom-popover-item" onClick={() => { setMoreMenuOpen(false); setSettingsOpen(true); }}>
-                      <Settings size={14} /> Meeting Settings
                     </div>
                   </div>
                 )}
