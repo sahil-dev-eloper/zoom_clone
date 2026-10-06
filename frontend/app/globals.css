@@ -2404,6 +2404,7 @@ img, video { display: block; max-width: 100%; }
   background: #F8FAFC;
   border: 1px solid #E2E8F0;
   border-radius: 8px;
+  gap: 10px;
 }
 
 .zoom-scheduled-time-badge {
@@ -2416,11 +2417,13 @@ img, video { display: block; max-width: 100%; }
   background: #EFF6FF;
   padding: 4px 8px;
   border-radius: 6px;
+  flex-shrink: 0;
 }
 
 .zoom-scheduled-info {
   flex: 1;
-  margin: 0 16px;
+  min-width: 0;
+  margin: 0;
 }
 
 .zoom-scheduled-info h4 {
@@ -2428,18 +2431,26 @@ img, video { display: block; max-width: 100%; }
   font-weight: 600;
   margin: 0;
   color: var(--zoom-text-dark);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .zoom-scheduled-info p {
   font-size: 12px;
   color: #64748B;
   margin: 2px 0 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .zoom-scheduled-actions {
   display: flex;
   gap: 8px;
+  flex-shrink: 0;
 }
+
 
 /* ----------------------------------------------------------------------
    4. Chat View (Screenshot 2)
@@ -5505,6 +5516,46 @@ html, body {
     text-align: center;
     justify-content: center;
   }
+
+  /* Home view scheduled meeting card — fix cramped 3-column layout on mobile */
+  .zoom-scheduled-item {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    padding: 10px 12px;
+  }
+
+  .zoom-scheduled-time-badge {
+    font-size: 11px;
+    padding: 3px 7px;
+  }
+
+  /* Info takes full remaining width on same row as time badge */
+  .zoom-scheduled-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .zoom-scheduled-info h4 {
+    font-size: 13px;
+  }
+
+  .zoom-scheduled-info p {
+    font-size: 11px;
+  }
+
+  /* Actions sit in a new row flush to the right */
+  .zoom-scheduled-actions {
+    width: 100%;
+    justify-content: flex-end;
+    margin-top: 6px;
+    gap: 6px;
+  }
+
+  .zoom-scheduled-actions button {
+    font-size: 12px;
+    padding: 5px 12px;
+  }
+
 
   /* Meetings View Mobile: Master-Detail List Navigation */
   .zoom-meetings-layout {

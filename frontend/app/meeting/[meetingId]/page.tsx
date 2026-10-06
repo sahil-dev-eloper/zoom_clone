@@ -28,8 +28,6 @@ import { api, formatInviteUrl, getApiBaseUrl, getWsBaseUrl } from '@/lib/api';
 import type { Meeting, Participant, AuthUser } from '@/types';
 import { getStoredUser } from '@/lib/auth';
 import { Brand } from '@/components/Brand';
-import { ZoomHeader } from '@/components/zoom/ZoomHeader';
-import { ZoomNavRail } from '@/components/zoom/ZoomNavRail';
 import { SettingsModal } from '@/components/zoom/SettingsModal';
 
 // ---------------------------------------------------------------------------
@@ -105,8 +103,6 @@ export default function MeetingRoomPage({
 
   // Zoom Workplace In-Meeting UI State
   const [infoPopupOpen, setInfoPopupOpen] = useState(false);
-  const [audioMenuOpen, setAudioMenuOpen] = useState(false);
-  const [videoMenuOpen, setVideoMenuOpen] = useState(false);
   const [hostMenuOpen, setHostMenuOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [endConfirmOpen, setEndConfirmOpen] = useState(false);
@@ -352,23 +348,23 @@ export default function MeetingRoomPage({
       if (m.status === 'ended') {
         setError('This meeting has ended.');
       }
-    } catch {
-      // Resilient fallback meeting if not registered yet
-      const fallbackMeeting: Meeting = {
-        meeting_id: meetingId,
-        invite_token: 'zoom_' + meetingId.slice(0, 6),
-        title: 'Zoom Meeting',
-        host_name: 'Host',
-        scheduled_time: new Date().toISOString(),
-        duration_minutes: 60,
-        status: 'active',
-        created_at: new Date().toISOString(),
-        invite_url: typeof window !== 'undefined' ? `${window.location.origin}/join?meeting=${meetingId}` : '',
-        participant_count: 1,
-      };
-      setMeeting(fallbackMeeting);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const lower = msg.toLowerCase();
+      // If it's a genuine network offline, keep the page in loading state so it retries
+      const isOffline =
+        lower.includes('failed to fetch') ||
+        lower.includes('networkerror') ||
+        lower.includes('network request failed') ||
+        lower.includes('load failed');
+      if (!isOffline) {
+        // Real API error (404, etc.) — show error and stop
+        setError(msg || 'Meeting not found. Check the meeting ID or invitation link.');
+      }
+      // If truly offline, meeting stays null → loading spinner keeps showing
     }
   }, [meetingId]);
+
 
   // ---- Load participants & detect kicked ----
 
@@ -976,22 +972,44 @@ export default function MeetingRoomPage({
       const newUrl = `/meeting/${meetingId}?session=${res.session_id}&name=${encodeURIComponent(nameToUse)}${res.is_host ? '&host=true' : ''}`;
       window.history.replaceState(null, '', newUrl);
     } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : '';
-      if (errMsg.toLowerCase().includes('ended')) {
-        setError('This meeting has ended and is no longer available.');
+      const errMsg = err instanceof Error ? err.message : String(err);
+      const lower = errMsg.toLowerCase();
+
+      // Surface real server errors — never silently bypass them
+      if (
+        lower.includes('not found') ||
+        lower.includes('404') ||
+        lower.includes('ended') ||
+        lower.includes('no longer available') ||
+        lower.includes('meeting')
+      ) {
+        setJoinError(errMsg || 'Meeting not found. Please check the meeting ID.');
+        setJoining(false);
         return;
       }
-      // Fallback local session if backend offline or meeting was client-created
-      const mockSession = 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
-      setSessionId(mockSession);
-      setDisplayName(nameToUse);
-      const isHostFallback = initialHost;
-      setIsHost(isHostFallback);
-      const newUrl = `/meeting/${meetingId}?session=${mockSession}&name=${encodeURIComponent(nameToUse)}${isHostFallback ? '&host=true' : ''}`;
-      window.history.replaceState(null, '', newUrl);
+
+      // Only use local session fallback when the backend is genuinely unreachable (network offline)
+      const isTrulyOffline =
+        lower.includes('failed to fetch') ||
+        lower.includes('networkerror') ||
+        lower.includes('network request failed') ||
+        lower.includes('load failed');
+
+      if (isTrulyOffline) {
+        const mockSession = 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+        setSessionId(mockSession);
+        setDisplayName(nameToUse);
+        const isHostFallback = initialHost;
+        setIsHost(isHostFallback);
+        const newUrl = `/meeting/${meetingId}?session=${mockSession}&name=${encodeURIComponent(nameToUse)}${isHostFallback ? '&host=true' : ''}`;
+        window.history.replaceState(null, '', newUrl);
+      } else {
+        setJoinError(errMsg || 'Failed to join meeting. Please try again.');
+      }
     } finally {
       setJoining(false);
     }
+
   }, [joinPromptName, displayName, meetingId, initialHost]);
 
   // Auto-join meeting:
@@ -1736,28 +1754,7 @@ export default function MeetingRoomPage({
   // ---- Render: Active Zoom Meeting Room matching Reference Interface ----
 
   return (
-    <div className="zoom-workplace-app zoom-meeting-page-root">
-      {/* Zoom Workplace Topbar */}
-      <ZoomHeader
-        onNavigateTab={(tab) => {
-          if (confirm(`Leave meeting to return to ${tab}?`)) {
-            handleLeave();
-          }
-        }}
-      />
-
-      {/* Main Container: Left NavRail + In-Meeting Canvas */}
-      <div className="zoom-meeting-app-body" style={{ flex: 1, display: 'flex', minHeight: 0, overflow: 'hidden' }}>
-        {/* Left Navigation Rail */}
-        <ZoomNavRail
-          activeTab="meetings"
-          onSelectTab={(tab) => {
-            if (confirm(`Leave meeting to view ${tab}?`)) {
-              handleLeave();
-            }
-          }}
-        />
-
+    <div style={{ display: 'flex', flexDirection: 'column', width: '100vw', height: '100dvh', overflow: 'hidden', background: '#000' }}>
         {/* In-Meeting Room Frame */}
         <main
           className="zoom-inmeeting-app-shell"
@@ -2171,36 +2168,8 @@ export default function MeetingRoomPage({
                   </div>
                   <span className="zoom-dock-label">
                     {muted ? 'Unmute' : 'Mute'}
-                    <span
-                      className="zoom-caret-mini"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setAudioMenuOpen(!audioMenuOpen);
-                      }}
-                    >
-                      ^
-                    </span>
                   </span>
                 </button>
-
-                {/* Audio options popover */}
-                {audioMenuOpen && (
-                  <div className="zoom-inmeeting-popover">
-                    <div className="zoom-popover-header">Select Microphone</div>
-                    <div className="zoom-popover-item" onClick={() => setAudioMenuOpen(false)}>
-                      <Check size={14} color="#22c55e" /> Default - Internal Microphone
-                    </div>
-                    <div className="zoom-popover-divider" />
-                    <div className="zoom-popover-header">Select Speaker</div>
-                    <div className="zoom-popover-item" onClick={() => setAudioMenuOpen(false)}>
-                      <Check size={14} color="#22c55e" /> Same as System (Realtek Audio)
-                    </div>
-                    <div className="zoom-popover-divider" />
-                    <div className="zoom-popover-item" onClick={() => { setAudioMenuOpen(false); setSettingsOpen(true); }}>
-                      Audio Settings...
-                    </div>
-                  </div>
-                )}
               </div>
 
               {/* Video / Stop Video */}
@@ -2219,34 +2188,8 @@ export default function MeetingRoomPage({
                   </div>
                   <span className="zoom-dock-label">
                     {cameraOn ? 'Stop Video' : 'Video'}
-                    <span
-                      className="zoom-caret-mini"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setVideoMenuOpen(!videoMenuOpen);
-                      }}
-                    >
-                      ^
-                    </span>
                   </span>
                 </button>
-
-                {/* Video options popover */}
-                {videoMenuOpen && (
-                  <div className="zoom-inmeeting-popover">
-                    <div className="zoom-popover-header">Select Camera</div>
-                    <div className="zoom-popover-item" onClick={() => setVideoMenuOpen(false)}>
-                      <Check size={14} color="#22c55e" /> Integrated Webcam (HD)
-                    </div>
-                    <div className="zoom-popover-divider" />
-                    <div className="zoom-popover-item" onClick={() => setVideoMenuOpen(false)}>
-                      Choose Virtual Background...
-                    </div>
-                    <div className="zoom-popover-item" onClick={() => { setVideoMenuOpen(false); setSettingsOpen(true); }}>
-                      Video Settings...
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 
@@ -2263,7 +2206,6 @@ export default function MeetingRoomPage({
                 </div>
                 <span className="zoom-dock-label">
                   Participants {people.length || 1}
-                  <span className="zoom-caret-mini">^</span>
                 </span>
               </button>
 
@@ -2281,7 +2223,6 @@ export default function MeetingRoomPage({
                 </div>
                 <span className="zoom-dock-label">
                   Share
-                  <span className="zoom-caret-mini">^</span>
                 </span>
               </button>
 
@@ -2297,7 +2238,6 @@ export default function MeetingRoomPage({
                   </div>
                   <span className="zoom-dock-label">
                     Host controls
-                    <span className="zoom-caret-mini">^</span>
                   </span>
                 </button>
 
@@ -2397,7 +2337,6 @@ export default function MeetingRoomPage({
             onClose={() => setSettingsOpen(false)}
           />
         </main>
-      </div>
     </div>
   );
 }
