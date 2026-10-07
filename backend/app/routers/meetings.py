@@ -1,6 +1,7 @@
 """Meeting API routes — CRUD, lifecycle, participants, host controls."""
 
 import secrets
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
@@ -32,6 +33,49 @@ def _base_url(request: Request) -> str:
     from ..services import get_frontend_base
 
     return get_frontend_base(request)
+
+
+def _mark_meeting_ended(db: Session, meeting: Meeting, reason: str = "ended", now: datetime | None = None) -> None:
+    """Transition a meeting to ended status and ensure left_at is set for all participants."""
+    if now is None:
+        now = utcnow()
+    meeting.status = "ended"
+    if not meeting.ended_at:
+        meeting.ended_at = now
+    if meeting.created_at and (not meeting.duration_minutes or meeting.duration_minutes == 0):
+        duration = max(1, int((meeting.ended_at - meeting.created_at).total_seconds() / 60))
+        meeting.duration_minutes = duration
+    for p in meeting.participants:
+        if p.left_at is None:
+            p.left_at = now
+    db.add(
+        MeetingHistory(
+            meeting_id=meeting.id,
+            action=reason,
+            timestamp=now,
+        )
+    )
+
+
+def _has_active_host(meeting: Meeting) -> bool:
+    """Return True if at least one participant is a host and currently in the meeting."""
+    return any(p.is_host and p.left_at is None for p in meeting.participants)
+
+
+def _sync_active_meeting_status(db: Session, meeting: Meeting, now: datetime | None = None) -> bool:
+    """If meeting is active but has no active host present (and wasn't just created in last 45s without a host having left), end it."""
+    if meeting.status != "active":
+        return False
+    if now is None:
+        now = utcnow()
+    has_host = _has_active_host(meeting)
+    if not has_host:
+        had_host_who_left = any(p.is_host and p.left_at is not None for p in meeting.participants)
+        is_fresh = (not had_host_who_left) and meeting.created_at and (now - meeting.created_at).total_seconds() < 45
+        if not is_fresh:
+            _mark_meeting_ended(db, meeting, reason="ended:no_active_host", now=now)
+            return True
+    return False
 
 
 def _get_meeting(db: Session, meeting_id: str, auto_create: bool = False) -> Meeting:
@@ -131,7 +175,7 @@ def schedule(
     if payload.scheduled_time <= utcnow():
         raise HTTPException(
             status_code=422,
-            detail="Scheduled time must be in the future.",
+            detail="Meetings cannot be scheduled in the past. Scheduled time must be in the future.",
         )
     host_name = current_user.display_name if current_user else HOST_NAME
     user_id = current_user.id if current_user else None
@@ -163,12 +207,9 @@ def upcoming(
     If the user is not logged in, returns an empty list.
     When authenticated, returns user's scheduled meetings plus seed demo meetings.
     """
-    if not current_user:
-        return []
-
     now = utcnow()
 
-    # 1. Exactly 5 seed demo upcoming meetings (shown only after authentication)
+    # 1. Exactly 5 seed demo upcoming meetings (shown after authentication or fallback)
     seed_upcoming = (
         db.scalars(
             select(Meeting)
@@ -183,21 +224,31 @@ def upcoming(
         .all()
     )
 
-    # 2. User's own future scheduled meetings
-    participant_meeting_ids = select(Participant.meeting_id).where(
-        Participant.user_id == current_user.id
-    )
+    # 2. User's own future scheduled meetings (or unauthenticated scheduled meetings)
+    if current_user:
+        participant_meeting_ids = select(Participant.meeting_id).where(
+            Participant.user_id == current_user.id
+        )
+        user_cond = (
+            (Meeting.is_seed.is_(False) | Meeting.is_seed.is_(None))
+            & (
+                (Meeting.user_id == current_user.id)
+                | Meeting.id.in_(participant_meeting_ids)
+            )
+        )
+    else:
+        user_cond = (
+            (Meeting.is_seed.is_(False) | Meeting.is_seed.is_(None))
+            & (Meeting.user_id.is_(None))
+        )
+
     user_upcoming = (
         db.scalars(
             select(Meeting)
             .where(
-                (Meeting.is_seed.is_(False) | Meeting.is_seed.is_(None)),
+                user_cond,
                 Meeting.status == "scheduled",
                 Meeting.scheduled_time >= now,
-                (
-                    (Meeting.user_id == current_user.id)
-                    | Meeting.id.in_(participant_meeting_ids)
-                ),
             )
             .order_by(Meeting.scheduled_time)
         )
@@ -221,12 +272,9 @@ def recent(
     If the user is not logged in, returns an empty list.
     When authenticated, returns user's meetings plus the 5 seed demo history meetings.
     """
-    if not current_user:
-        return []
-
     now = utcnow()
 
-    # 1. 5 Seed demo meetings (ended past history records, shown only after authentication)
+    # 1. 5 Seed demo meetings (ended past history records)
     seed_recent = (
         db.scalars(
             select(Meeting)
@@ -243,7 +291,7 @@ def recent(
     user_meetings: list[Meeting] = []
     seen_ids: set[str] = set()
 
-    # 2. Gather user's recent meetings if logged in
+    # 2. Gather user's recent meetings (or unauthenticated meetings)
     if current_user:
         participant_meeting_ids = select(Participant.meeting_id).where(
             Participant.user_id == current_user.id
@@ -255,53 +303,69 @@ def recent(
                 | Meeting.id.in_(participant_meeting_ids)
             )
         )
-
-        # Active meetings (host hasn't ended meeting for all -> can rejoin!)
-        active_user_meetings = (
-            db.scalars(
-                select(Meeting)
-                .where(
-                    user_cond,
-                    Meeting.status == "active",
-                )
-                .order_by(Meeting.created_at.desc())
-            )
-            .all()
+    else:
+        user_cond = (
+            (Meeting.is_seed.is_(False) | Meeting.is_seed.is_(None))
+            & (Meeting.user_id.is_(None))
         )
 
-        # Ended meetings (past history)
-        ended_user_meetings = (
-            db.scalars(
-                select(Meeting)
-                .where(
-                    user_cond,
-                    Meeting.status == "ended",
-                )
-                .order_by(Meeting.ended_at.desc().nullslast())
-                .limit(20)
+    # Active meetings (only in progress if host is actively in the meeting!)
+    active_candidates = (
+        db.scalars(
+            select(Meeting)
+            .where(
+                user_cond,
+                Meeting.status == "active",
             )
-            .all()
+            .order_by(Meeting.created_at.desc())
         )
+        .all()
+    )
 
-        # Past-due scheduled meetings (time passed but never started)
-        pastdue_user_meetings = (
-            db.scalars(
-                select(Meeting)
-                .where(
-                    user_cond,
-                    Meeting.status == "scheduled",
-                    Meeting.scheduled_time < now,
-                )
-                .order_by(Meeting.scheduled_time.desc())
-                .limit(20)
+    dirty = False
+    active_user_meetings: list[Meeting] = []
+    for m in active_candidates:
+        if _sync_active_meeting_status(db, m, now=now):
+            dirty = True
+        else:
+            active_user_meetings.append(m)
+
+    if dirty:
+        db.commit()
+
+    # Ended meetings (past history)
+    ended_user_meetings = (
+        db.scalars(
+            select(Meeting)
+            .where(
+                user_cond,
+                Meeting.status == "ended",
             )
-            .all()
+            .order_by(Meeting.ended_at.desc().nullslast())
+            .limit(20)
         )
+        .all()
+    )
 
-        for m in list(active_user_meetings) + list(ended_user_meetings) + list(pastdue_user_meetings):
-            if m.meeting_id not in seen_ids:
-                seen_ids.add(m.meeting_id)
-                user_meetings.append(m)
+    # Past-due scheduled meetings (time passed but never started)
+    pastdue_user_meetings = (
+        db.scalars(
+            select(Meeting)
+            .where(
+                user_cond,
+                Meeting.status == "scheduled",
+                Meeting.scheduled_time < now,
+            )
+            .order_by(Meeting.scheduled_time.desc())
+            .limit(20)
+        )
+        .all()
+    )
+
+    for m in list(active_user_meetings) + list(ended_user_meetings) + list(pastdue_user_meetings):
+        if m.meeting_id not in seen_ids:
+            seen_ids.add(m.meeting_id)
+            user_meetings.append(m)
 
     # 3. Extra recent meeting IDs (e.g. from local storage session in browser)
     if meeting_ids:
@@ -316,6 +380,12 @@ def recent(
                 )
                 .all()
             )
+            extra_dirty = False
+            for m in extra_meetings:
+                if _sync_active_meeting_status(db, m, now=now):
+                    extra_dirty = True
+            if extra_dirty:
+                db.commit()
             extra_sorted = sorted(
                 extra_meetings,
                 key=lambda m: (0 if m.status == "active" else 1, -(m.created_at.timestamp() if m.created_at else 0)),
@@ -483,14 +553,36 @@ def leave(
             status_code=404,
             detail="Participant session not found.",
         )
-    participant.left_at = utcnow()
+    now = utcnow()
+    participant.left_at = now
     db.add(
         MeetingHistory(
             meeting_id=meeting.id,
             action=f"left:{participant.display_name}",
-            timestamp=utcnow(),
+            timestamp=now,
         )
     )
+
+    if participant.is_host:
+        other_host = db.scalar(
+            select(Participant).where(
+                Participant.meeting_id == meeting.id,
+                Participant.is_host.is_(True),
+                Participant.left_at.is_(None),
+                Participant.id != participant.id,
+            )
+        )
+        if not other_host:
+            # Host has left and no other active host remains -> end meeting immediately
+            _mark_meeting_ended(db, meeting, reason="ended:host_left", now=now)
+    else:
+        # Check if ANY active participants remain
+        has_any_active = any(
+            p.left_at is None and p.id != participant.id for p in meeting.participants
+        )
+        if not has_any_active:
+            _mark_meeting_ended(db, meeting, reason="ended:all_left", now=now)
+
     db.commit()
     return {"ok": True}
 
@@ -524,18 +616,7 @@ def end(
         return _output(meeting, request)
 
     now = utcnow()
-    meeting.status = "ended"
-    meeting.ended_at = now
-
-    for p in meeting.participants:
-        if p.left_at is None:
-            p.left_at = now
-
-    db.add(
-        MeetingHistory(
-            meeting_id=meeting.id, action="ended", timestamp=now
-        )
-    )
+    _mark_meeting_ended(db, meeting, reason="ended:host_action", now=now)
     db.commit()
     db.refresh(meeting)
     return _output(meeting, request)

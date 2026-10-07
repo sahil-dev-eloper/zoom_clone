@@ -30,9 +30,6 @@ export function JoinModal({ onClose, defaultMeetingId }: JoinModalProps) {
     }
     return '';
   });
-  const [rememberName, setRememberName] = useState(true);
-  const [noAudio, setNoAudio] = useState(false);
-  const [turnOffVideo, setTurnOffVideo] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -66,17 +63,13 @@ export function JoinModal({ onClose, defaultMeetingId }: JoinModalProps) {
         display_name: displayName.trim(),
         is_host: isHosted ? true : undefined,
       });
-      const videoFlag = turnOffVideo ? '&video=false' : '';
-      const audioFlag = noAudio ? '&audio=false' : '';
       const hostFlag = (result.is_host || isHosted) ? '&host=true' : '';
-      window.location.href = `/meeting/${result.meeting.meeting_id}?session=${result.session_id}&name=${encodeURIComponent(displayName.trim())}${hostFlag}${videoFlag}${audioFlag}`;
+      window.location.href = `/meeting/${result.meeting.meeting_id}?session=${result.session_id}&name=${encodeURIComponent(displayName.trim())}${hostFlag}`;
     } catch {
       // Resilient fallback: redirect to room
       const fallbackSession = 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
-      const videoFlag = turnOffVideo ? '&video=false' : '';
-      const audioFlag = noAudio ? '&audio=false' : '';
       const hostFlag = isHosted ? '&host=true' : '';
-      window.location.href = `/meeting/${meetingId}?session=${fallbackSession}&name=${encodeURIComponent(displayName.trim())}${hostFlag}${videoFlag}${audioFlag}`;
+      window.location.href = `/meeting/${meetingId}?session=${fallbackSession}&name=${encodeURIComponent(displayName.trim())}${hostFlag}`;
     } finally {
       setBusy(false);
     }
@@ -128,35 +121,6 @@ export function JoinModal({ onClose, defaultMeetingId }: JoinModalProps) {
               placeholder="Your name"
               onKeyDown={handleKeyDown}
             />
-          </div>
-
-          <div className="zoom-dialog-options" style={{ marginTop: 16 }}>
-            <label className="zoom-checkbox-label">
-              <input
-                type="checkbox"
-                checked={rememberName}
-                onChange={(e) => setRememberName(e.target.checked)}
-              />
-              <span>Remember my name for future meetings</span>
-            </label>
-
-            <label className="zoom-checkbox-label" style={{ marginTop: 8 }}>
-              <input
-                type="checkbox"
-                checked={noAudio}
-                onChange={(e) => setNoAudio(e.target.checked)}
-              />
-              <span>Do not connect to audio</span>
-            </label>
-
-            <label className="zoom-checkbox-label" style={{ marginTop: 8 }}>
-              <input
-                type="checkbox"
-                checked={turnOffVideo}
-                onChange={(e) => setTurnOffVideo(e.target.checked)}
-              />
-              <span>Turn off my video</span>
-            </label>
           </div>
 
           {error && <p className="zoom-form-error">{error}</p>}

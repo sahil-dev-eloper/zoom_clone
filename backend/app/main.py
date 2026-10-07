@@ -286,9 +286,10 @@ async def signaling(websocket: WebSocket, meeting_id: str):
         # Clean up on disconnect
         if peer_id:
             # Mark participant as left in database so REST polling updates immediately
+            meeting_ended = False
             try:
                 from .database import SessionLocal, utcnow
-                from .models import MeetingHistory, Participant
+                from .models import Meeting, MeetingHistory, Participant
                 with SessionLocal() as db:
                     part = db.scalar(
                         select(Participant).where(
@@ -297,17 +298,64 @@ async def signaling(websocket: WebSocket, meeting_id: str):
                         )
                     )
                     if part:
-                        part.left_at = utcnow()
+                        now = utcnow()
+                        part.left_at = now
                         db.add(
                             MeetingHistory(
                                 meeting_id=part.meeting_id,
                                 action=f"left:{part.display_name}",
-                                timestamp=utcnow(),
+                                timestamp=now,
                             )
                         )
+                        meeting = db.scalar(
+                            select(Meeting).where(Meeting.id == part.meeting_id)
+                        )
+                        if meeting and meeting.status == "active":
+                            if part.is_host:
+                                other_active_host = db.scalar(
+                                    select(Participant).where(
+                                        Participant.meeting_id == meeting.id,
+                                        Participant.is_host.is_(True),
+                                        Participant.left_at.is_(None),
+                                        Participant.id != part.id,
+                                    )
+                                )
+                                if not other_active_host:
+                                    meeting.status = "ended"
+                                    meeting.ended_at = now
+                                    if meeting.created_at and (not meeting.duration_minutes or meeting.duration_minutes == 0):
+                                        meeting.duration_minutes = max(1, int((meeting.ended_at - meeting.created_at).total_seconds() / 60))
+                                    meeting_ended = True
+                                    for p in meeting.participants:
+                                        if p.left_at is None:
+                                            p.left_at = now
+                                    db.add(
+                                        MeetingHistory(
+                                            meeting_id=meeting.id,
+                                            action="ended:host_left",
+                                            timestamp=now,
+                                        )
+                                    )
+                            else:
+                                has_active_participants = any(
+                                    p.left_at is None and p.id != part.id
+                                    for p in meeting.participants
+                                )
+                                if not has_active_participants:
+                                    meeting.status = "ended"
+                                    meeting.ended_at = now
+                                    if meeting.created_at and (not meeting.duration_minutes or meeting.duration_minutes == 0):
+                                        meeting.duration_minutes = max(1, int((meeting.ended_at - meeting.created_at).total_seconds() / 60))
+                                    db.add(
+                                        MeetingHistory(
+                                            meeting_id=meeting.id,
+                                            action="ended:all_left",
+                                            timestamp=now,
+                                        )
+                                    )
                         db.commit()
                         logger.info(
-                            f"[Signaling] Marked participant {part.display_name} ({peer_id}) as left in DB on disconnect"
+                            f"[Signaling] Marked participant {part.display_name} ({peer_id}) as left in DB on disconnect (ended={meeting_ended})"
                         )
             except Exception as db_err:
                 logger.warning(
@@ -318,10 +366,13 @@ async def signaling(websocket: WebSocket, meeting_id: str):
                 _rooms[meeting_id].pop(peer_id, None)
                 for pid, ws in list(_rooms[meeting_id].items()):
                     try:
-                        await ws.send_json(
-                            {"type": "peer-left", "peerId": peer_id}
-                        )
+                        if meeting_ended:
+                            await ws.send_json({"type": "meeting-ended"})
+                        else:
+                            await ws.send_json(
+                                {"type": "peer-left", "peerId": peer_id}
+                            )
                     except Exception as e:
-                        logger.warning(f"[Signaling] Error sending peer-left to {pid}: {e}")
+                        logger.warning(f"[Signaling] Error sending cleanup to {pid}: {e}")
                 if not _rooms[meeting_id]:
                     del _rooms[meeting_id]

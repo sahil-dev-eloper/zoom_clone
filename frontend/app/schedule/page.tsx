@@ -4,7 +4,21 @@ import { useState } from 'react';
 import { ArrowLeft, CalendarDays, LoaderCircle } from 'lucide-react';
 import { api } from '@/lib/api';
 
+function getLocalDateString(d: Date = new Date()): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getLocalTimeString(d: Date = new Date()): string {
+  const hour = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${hour}:${min}`;
+}
+
 export default function SchedulePage() {
+  const todayStr = getLocalDateString();
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -38,7 +52,7 @@ export default function SchedulePage() {
       return;
     }
     if (localDate.getTime() <= Date.now()) {
-      setError('Scheduled time must be in the future.');
+      setError('Meetings cannot be scheduled in the past. Please select a future date and time.');
       return;
     }
 
@@ -119,7 +133,11 @@ export default function SchedulePage() {
             <input
               type="date"
               value={form.date}
-              onChange={(e) => update('date', e.target.value)}
+              min={todayStr}
+              onChange={(e) => {
+                update('date', e.target.value);
+                setError('');
+              }}
             />
           </div>
           <div className="field">
@@ -127,7 +145,11 @@ export default function SchedulePage() {
             <input
               type="time"
               value={form.time}
-              onChange={(e) => update('time', e.target.value)}
+              min={form.date === todayStr ? getLocalTimeString() : undefined}
+              onChange={(e) => {
+                update('time', e.target.value);
+                setError('');
+              }}
             />
           </div>
         </div>

@@ -101,3 +101,68 @@ def test_instant_meeting_and_user_scoped_recents(client):
     # Trying to join ended meeting returns 409
     join_after_end = client.post("/api/meetings/join", json={"meeting_id": mid, "display_name": "Bob Participant"}, headers=part_headers)
     assert join_after_end.status_code == 409
+
+
+def test_host_leaving_ends_meeting_in_recents(client):
+    host_id, host_token = create_user("host_dan@example.com", "Dan Host")
+    part_id, part_token = create_user("part_eva@example.com", "Eva Participant")
+
+    host_headers = {"Authorization": f"Bearer {host_token}"}
+    part_headers = {"Authorization": f"Bearer {part_token}"}
+
+    # 1. Host creates instant meeting and joins
+    res = client.post("/api/meetings/instant", headers=host_headers)
+    assert res.status_code == 201
+    mid = res.json()["meeting_id"]
+
+    join_host = client.post("/api/meetings/join", json={"meeting_id": mid, "display_name": "Dan Host"}, headers=host_headers).json()
+    assert join_host["is_host"] is True
+
+    # 2. Eva joins
+    join_part = client.post("/api/meetings/join", json={"meeting_id": mid, "display_name": "Eva Participant"}, headers=part_headers).json()
+    assert join_part["is_host"] is False
+
+    # 3. Both see meeting as 'active' (In Progress) while host is inside
+    host_recents = client.get("/api/meetings/recent", headers=host_headers).json()
+    assert [m for m in host_recents if m["meeting_id"] == mid][0]["status"] == "active"
+
+    part_recents = client.get("/api/meetings/recent", headers=part_headers).json()
+    assert [m for m in part_recents if m["meeting_id"] == mid][0]["status"] == "active"
+
+    # 4. Host leaves the meeting via /leave (without explicit /end)
+    leave_res = client.post(f"/api/meetings/{mid}/leave", json={"session_id": join_host["session_id"]})
+    assert leave_res.status_code == 200
+
+    # 5. Immediately, meeting should be 'ended' for both host and participant!
+    host_recents_after = client.get("/api/meetings/recent", headers=host_headers).json()
+    host_item = [m for m in host_recents_after if m["meeting_id"] == mid][0]
+    assert host_item["status"] == "ended"
+
+    part_recents_after = client.get("/api/meetings/recent", headers=part_headers).json()
+    part_item = [m for m in part_recents_after if m["meeting_id"] == mid][0]
+    assert part_item["status"] == "ended"
+
+
+def test_zombie_meeting_auto_cleanup_in_recents(client):
+    host_id, host_token = create_user("host_frank@example.com", "Frank Host")
+    host_headers = {"Authorization": f"Bearer {host_token}"}
+
+    # Create meeting and manually simulate a zombie active meeting where host left
+    res = client.post("/api/meetings/instant", headers=host_headers)
+    mid = res.json()["meeting_id"]
+    join_res = client.post("/api/meetings/join", json={"meeting_id": mid, "display_name": "Frank Host"}, headers=host_headers).json()
+
+    # Manually mark participant as left in DB while keeping meeting status='active' (simulating old bug)
+    from app.database import SessionLocal, utcnow
+    from app.models import Participant, Meeting
+    with SessionLocal() as db:
+        p = db.query(Participant).filter(Participant.session_id == join_res["session_id"]).first()
+        p.left_at = utcnow()
+        m = db.query(Meeting).filter(Meeting.meeting_id == mid).first()
+        m.status = "active"
+        db.commit()
+
+    # Calling /recent should detect no active host, auto-heal to 'ended'
+    recents = client.get("/api/meetings/recent", headers=host_headers).json()
+    found = [m for m in recents if m["meeting_id"] == mid][0]
+    assert found["status"] == "ended"

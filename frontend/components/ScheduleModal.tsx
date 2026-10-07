@@ -12,16 +12,37 @@ interface ScheduleModalProps {
   onRequireAuth?: () => void;
 }
 
+function getLocalDateString(d: Date = new Date()): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getLocalTimeString(d: Date = new Date()): string {
+  const hour = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${hour}:${min}`;
+}
+
+function getDefaultFutureTime(): string {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() + 30);
+  d.setMinutes(Math.ceil(d.getMinutes() / 15) * 15, 0, 0);
+  return getLocalTimeString(d);
+}
+
 export function ScheduleModal({ onClose, onCreated, onRequireAuth }: ScheduleModalProps) {
   const { user, isLoggedIn } = useAuth();
   const [title, setTitle] = useState(() => (user?.display_name ? `${user.display_name}'s Meeting` : 'My Meeting'));
   const [description, setDescription] = useState('');
+  const todayStr = getLocalDateString();
   const [date, setDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
-    return d.toISOString().split('T')[0];
+    return getLocalDateString(d);
   });
-  const [time, setTime] = useState('11:00');
+  const [time, setTime] = useState(getDefaultFutureTime);
   const [duration, setDuration] = useState('30');
 
   const [error, setError] = useState('');
@@ -55,6 +76,11 @@ export function ScheduleModal({ onClose, onCreated, onRequireAuth }: ScheduleMod
     const localDate = new Date(`${date}T${time}`);
     if (isNaN(localDate.getTime())) {
       setError('Please enter a valid date and time.');
+      return;
+    }
+
+    if (localDate.getTime() <= Date.now()) {
+      setError('Meetings cannot be scheduled in the past. Please select a future date and time.');
       return;
     }
 
@@ -186,7 +212,11 @@ export function ScheduleModal({ onClose, onCreated, onRequireAuth }: ScheduleMod
                 type="date"
                 className="zoom-input"
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
+                min={todayStr}
+                onChange={(e) => {
+                  setDate(e.target.value);
+                  setError('');
+                }}
               />
             </div>
 
@@ -199,7 +229,11 @@ export function ScheduleModal({ onClose, onCreated, onRequireAuth }: ScheduleMod
                 type="time"
                 className="zoom-input"
                 value={time}
-                onChange={(e) => setTime(e.target.value)}
+                min={date === todayStr ? getLocalTimeString() : undefined}
+                onChange={(e) => {
+                  setTime(e.target.value);
+                  setError('');
+                }}
               />
             </div>
           </div>

@@ -70,7 +70,7 @@ export default function ZoomWorkplaceDashboard() {
     }
   };
 
-  const loadMeetings = useCallback(async () => {
+  const loadMeetings = useCallback(async (isSilent = false) => {
     if (!isLoggedIn) {
       setUpcoming([]);
       setRecent([]);
@@ -79,7 +79,7 @@ export default function ZoomWorkplaceDashboard() {
     }
     try {
       setError('');
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       const [upcomingList, recentList] = await Promise.all([
         api.upcoming().catch(() => []),
         api.recent().catch(() => []),
@@ -89,7 +89,7 @@ export default function ZoomWorkplaceDashboard() {
     } catch (e) {
       console.warn('Could not reach backend meetings endpoint:', e);
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, [isLoggedIn]);
 
@@ -102,6 +102,23 @@ export default function ZoomWorkplaceDashboard() {
       loadMeetings();
     }
   }, [loadMeetings, isLoggedIn, user?.id]);
+
+  // Auto-refresh meetings when switching dashboard tabs, regaining window focus, or periodically
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    loadMeetings(true);
+  }, [activeTab, isLoggedIn, loadMeetings]);
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    const handleFocus = () => loadMeetings(true);
+    window.addEventListener('focus', handleFocus);
+    const interval = setInterval(() => loadMeetings(true), 10000);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      clearInterval(interval);
+    };
+  }, [isLoggedIn, loadMeetings]);
 
   // Start instant meeting
   const handleStartInstant = async () => {
