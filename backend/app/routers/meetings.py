@@ -341,8 +341,8 @@ def recent(
                 user_cond,
                 Meeting.status == "ended",
             )
-            .order_by(Meeting.ended_at.desc().nullslast())
-            .limit(20)
+            .order_by(Meeting.ended_at.desc().nullslast(), Meeting.id.desc())
+            .limit(50)
         )
         .all()
     )
@@ -485,6 +485,14 @@ def join(
             Participant.session_id == session_id,
         )
     )
+    # Protect existing active participants (especially the host) from having their session hijacked
+    if existing and existing.left_at is None and (
+        existing.is_host or
+        (existing.display_name.strip().lower() != display_name_to_use.strip().lower())
+    ):
+        session_id = secrets.token_urlsafe(18)
+        existing = None
+
     if existing:
         existing.left_at = None
         existing.display_name = display_name_to_use

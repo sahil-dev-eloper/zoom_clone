@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { LoaderCircle, X, LogIn } from 'lucide-react';
-import { api, isHostedMeetingId } from '@/lib/api';
+import { api } from '@/lib/api';
 import { getStoredUser } from '@/lib/auth';
 
 interface JoinModalProps {
@@ -55,21 +55,17 @@ export function JoinModal({ onClose, defaultMeetingId }: JoinModalProps) {
     setBusy(true);
     setError('');
 
-    const isHosted = isHostedMeetingId(meetingId);
-
     try {
       const result = await api.join({
         meeting_id: meetingId,
         display_name: displayName.trim(),
-        is_host: isHosted ? true : undefined,
       });
-      const hostFlag = (result.is_host || isHosted) ? '&host=true' : '';
+      const hostFlag = result.is_host ? '&host=true' : '';
       window.location.href = `/meeting/${result.meeting.meeting_id}?session=${result.session_id}&name=${encodeURIComponent(displayName.trim())}${hostFlag}`;
     } catch {
       // Resilient fallback: redirect to room
       const fallbackSession = 'sess_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
-      const hostFlag = isHosted ? '&host=true' : '';
-      window.location.href = `/meeting/${meetingId}?session=${fallbackSession}&name=${encodeURIComponent(displayName.trim())}${hostFlag}`;
+      window.location.href = `/meeting/${meetingId}?session=${fallbackSession}&name=${encodeURIComponent(displayName.trim())}`;
     } finally {
       setBusy(false);
     }

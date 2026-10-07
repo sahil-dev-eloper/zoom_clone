@@ -99,7 +99,11 @@ export default function MeetingRoomPage({
       setDisplayName((prev) => prev || stored.display_name);
       setJoinPromptName((prev) => prev || stored.display_name);
     }
-  }, []);
+    // Clean address bar so copying the browser URL doesn't leak session_id or host=true to other participants
+    if (typeof window !== 'undefined' && window.location.search) {
+      window.history.replaceState(null, '', `/meeting/${meetingId}`);
+    }
+  }, [meetingId]);
 
   // Zoom Workplace In-Meeting UI State
   const [infoPopupOpen, setInfoPopupOpen] = useState(false);
@@ -253,9 +257,13 @@ export default function MeetingRoomPage({
     if (el) {
       remoteVideoRefs.current.set(peerId, el);
       const stream = remoteMediaStreamsRef.current[peerId] || remoteStreams[peerId];
-      if (stream && el.srcObject !== stream) {
-        el.srcObject = stream;
-        el.play().catch(() => {});
+      if (stream) {
+        if (el.srcObject !== stream) {
+          el.srcObject = stream;
+        }
+        if (el.paused) {
+          el.play().catch(() => {});
+        }
       }
     } else {
       remoteVideoRefs.current.delete(peerId);
@@ -291,9 +299,13 @@ export default function MeetingRoomPage({
     // 2. Sync all remote videos
     remoteVideoRefs.current.forEach((vEl, peerId) => {
       const stream = remoteMediaStreamsRef.current[peerId] || remoteStreams[peerId];
-      if (vEl && stream && vEl.srcObject !== stream) {
-        vEl.srcObject = stream;
-        vEl.play().catch(() => {});
+      if (vEl && stream) {
+        if (vEl.srcObject !== stream) {
+          vEl.srcObject = stream;
+        }
+        if (vEl.paused) {
+          vEl.play().catch(() => {});
+        }
       }
     });
 
@@ -376,11 +388,11 @@ export default function MeetingRoomPage({
       hasLoadedInitialParticipantsRef.current = true;
       setHasLoadedInitialParticipants(true);
 
-      if (sessionIdRef.current && wasLoaded) {
+      if (!isHostRef.current && sessionIdRef.current && wasLoaded) {
         const stillInRoom = parts.some(
           (p) => p.session_id === sessionIdRef.current && p.left_at === null
         );
-        if (!stillInRoom) {
+        if (!stillInRoom && parts.length > 0) {
           setKicked(true);
         }
       }
@@ -502,7 +514,7 @@ export default function MeetingRoomPage({
         }
       }
     }
-    if (!aSender && !getMediaSender(pc, 'audio')) {
+    if (isInitiator && !aSender && !getMediaSender(pc, 'audio')) {
       pc.addTransceiver('audio', { direction: 'sendrecv' });
     }
 
@@ -518,7 +530,7 @@ export default function MeetingRoomPage({
         }
       }
     }
-    if (!vSender && !getMediaSender(pc, 'video')) {
+    if (isInitiator && !vSender && !getMediaSender(pc, 'video')) {
       pc.addTransceiver('video', { direction: 'sendrecv' });
     }
 
@@ -562,9 +574,13 @@ export default function MeetingRoomPage({
 
       // Immediately bind to any existing mounted video and audio elements
       const vEl = remoteVideoRefs.current.get(targetPeerId);
-      if (vEl && vEl.srcObject !== stream) {
-        vEl.srcObject = stream;
-        vEl.play().catch(() => {});
+      if (vEl && stream) {
+        if (vEl.srcObject !== stream) {
+          vEl.srcObject = stream;
+        }
+        if (vEl.paused) {
+          vEl.play().catch(() => {});
+        }
       }
       const aEl = remoteAudioRefs.current.get(targetPeerId);
       if (aEl && aEl.srcObject !== stream) {
@@ -578,6 +594,12 @@ export default function MeetingRoomPage({
       const onTrackChange = () => {
         console.log(`[Zooom WebRTC] Remote track changed (${track.kind}) for ${targetPeerId}: readyState=${track.readyState}, enabled=${track.enabled}`);
         setStreamVersion((v) => v + 1);
+        if (track.kind === 'video') {
+          const targetVEl = remoteVideoRefs.current.get(targetPeerId);
+          if (targetVEl && targetVEl.paused) {
+            targetVEl.play().catch(() => {});
+          }
+        }
       };
       track.addEventListener('mute', onTrackChange);
       track.addEventListener('unmute', onTrackChange);
@@ -965,7 +987,10 @@ export default function MeetingRoomPage({
       ((activeStored?.display_name && activeStored.display_name.trim().toLowerCase() === meeting.host_name.trim().toLowerCase()) ||
        (nameToUse.trim().toLowerCase() === meeting.host_name.trim().toLowerCase()))
     );
-    const userIsHost = Boolean(initialHost || isHostedLocal || matchesHostName);
+    const userIsHost = Boolean(
+      initialHost ||
+      matchesHostName
+    );
 
     try {
       const res = await api.join({
@@ -978,8 +1003,7 @@ export default function MeetingRoomPage({
       const finalIsHost = Boolean(res.is_host || userIsHost);
       setIsHost(finalIsHost);
       setMeeting(res.meeting);
-      const newUrl = `/meeting/${meetingId}?session=${res.session_id}&name=${encodeURIComponent(nameToUse)}${finalIsHost ? '&host=true' : ''}`;
-      window.history.replaceState(null, '', newUrl);
+      window.history.replaceState(null, '', `/meeting/${meetingId}`);
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
       const lower = errMsg.toLowerCase();
@@ -1010,8 +1034,7 @@ export default function MeetingRoomPage({
         setDisplayName(nameToUse);
         const isHostFallback = userIsHost;
         setIsHost(isHostFallback);
-        const newUrl = `/meeting/${meetingId}?session=${mockSession}&name=${encodeURIComponent(nameToUse)}${isHostFallback ? '&host=true' : ''}`;
-        window.history.replaceState(null, '', newUrl);
+        window.history.replaceState(null, '', `/meeting/${meetingId}`);
       } else {
         setJoinError(errMsg || 'Failed to join meeting. Please try again.');
       }
@@ -1969,14 +1992,14 @@ export default function MeetingRoomPage({
                   {/* Remote Participant Tiles */}
                   {otherPeople.map((p) => {
                     const remoteStream = remoteMediaStreamsRef.current[p.session_id] || remoteStreams[p.session_id];
+                    const peerVideoOn = peerMediaState[p.session_id]?.video === true;
                     const hasLiveVideoTrack = Boolean(
                       remoteStream &&
                         remoteStream.getVideoTracks().some(
                           (t) => t.enabled && t.readyState === 'live'
                         )
                     );
-                    const hasPeerVideoState = peerMediaState[p.session_id]?.video ?? false;
-                    const hasVideo = hasLiveVideoTrack || hasPeerVideoState;
+                    const hasVideo = Boolean(peerVideoOn && hasLiveVideoTrack);
                     const isSpeaking = peerSpeaking[p.session_id] ?? false;
                     const isMuted = !(peerMediaState[p.session_id]?.audio ?? true);
 

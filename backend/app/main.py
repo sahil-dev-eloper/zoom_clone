@@ -285,6 +285,13 @@ async def signaling(websocket: WebSocket, meeting_id: str):
     finally:
         # Clean up on disconnect
         if peer_id:
+            # If another socket has already taken over for this peer_id, do not destroy their session
+            if meeting_id in _rooms and _rooms[meeting_id].get(peer_id) is not websocket:
+                logger.info(
+                    f"[Signaling] Stale/superseded socket disconnected for {peer_id} in {meeting_id}; active socket remains."
+                )
+                return
+
             # Mark participant as left in database so REST polling updates immediately
             meeting_ended = False
             try:
@@ -363,7 +370,8 @@ async def signaling(websocket: WebSocket, meeting_id: str):
                 )
 
             if meeting_id in _rooms:
-                _rooms[meeting_id].pop(peer_id, None)
+                if _rooms[meeting_id].get(peer_id) is websocket:
+                    _rooms[meeting_id].pop(peer_id, None)
                 for pid, ws in list(_rooms[meeting_id].items()):
                     try:
                         if meeting_ended:
